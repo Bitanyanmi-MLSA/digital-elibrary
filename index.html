@@ -66,7 +66,7 @@ td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
 </style>
 </head>
 <body>
-<div class="banner">DEMO PROTOTYPE – sample content and simulated AI for client preview. Not the production application.</div>
+<div class="banner">DEMO PROTOTYPE – sample content and live Azure OpenAI Buddy for client preview. Not the production application.</div>
 
 <header id="hdr" class="hide">
   <h1>📚 Digital E-Library <small id="who"></small></h1>
@@ -125,7 +125,7 @@ td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
 <section id="v-buddy" class="hide">
   <div class="card">
     <h2>🦉 Kofi the Reading Buddy</h2>
-    <small>🤖 I'm an AI helper, not a person. Answers come only from the library. (Simulated for the demo.)</small>
+    <small>🤖 I'm an AI helper, not a person. Powered by Azure OpenAI with child-safety filtering. Unsafe questions are flagged to the librarian.</small>
     <div class="chat" id="chat"></div>
     <div class="sp">
       <input type="text" id="ci" placeholder="Ask about a story or word…" style="flex:1">
@@ -254,7 +254,7 @@ function drawPad(){const p=$('#pad');p.innerHTML='';[1,2,3,4,5,6,7,8,9,'C',0,'�
 function key(k){if(k==='C')st.pin='';else if(k==='✔'){if(st.pin.length===4)login('Kwesi')}else if(st.pin.length<4){st.pin+=k;if(st.pin.length===4){$('#dots').textContent='●●●●';setTimeout(()=>login('Kwesi'),250);return}}
  $('#dots').textContent=(st.pin.replace(/./g,'●')+'····').slice(0,4)}
 function login(n){st.user=n;st.pin='';$('#dots').textContent='····';$('#who').textContent='– Hi, '+n+'! 👋';$('#hdr').classList.remove('hide');startTimer();show('home')}
-function logout(){stopRead();st.user=null;$('#hdr').classList.add('hide');$('#chat').innerHTML='';clearInterval(tm);show('login')}
+function logout(){stopRead();hist.length=0;st.user=null;$('#hdr').classList.add('hide');$('#chat').innerHTML='';clearInterval(tm);show('login')}
 let tm,secs=900;function startTimer(){secs=900;clearInterval(tm);tm=setInterval(()=>{secs--;const t=$('#timer');if(t)t.textContent=Math.floor(secs/60)+':'+String(secs%60).padStart(2,'0');if(secs<=0){clearInterval(tm);alert('Time for a reading break! 📖')}},1000)}
 
 function chips(el,arr,key){el.innerHTML='';arr.forEach(a=>{const c=document.createElement('span');c.className='chip'+(st[key]===a?' on':'');c.textContent=a;c.onclick=()=>{st[key]=a;renderHome()};el.appendChild(c)})}
@@ -274,7 +274,7 @@ function say(t,onend){if(!('speechSynthesis' in window)){if(onend)setTimeout(one
 let reading=0;
 function readAloud(){const ps=st.cur.txt,tok=++reading;let i=0;const next=()=>{if(tok!==reading)return;document.querySelectorAll('.reader p').forEach(p=>p.classList.remove('hl'));if(i>=ps.length)return;$('#p'+i).classList.add('hl');say(ps[i],()=>{i++;next()})};next()}
 function stopRead(){reading++;if('speechSynthesis' in window)speechSynthesis.cancel();document.querySelectorAll('.reader p').forEach(p=>p.classList.remove('hl'))}
-function wd(el){const w=el.textContent.replace(/[^\w']/g,'').toLowerCase();stopRead();say(w);$('#wordbox').innerHTML=`<div class="card"><b>${w}</b>: ${DEF[w]||'🦉 Ask Kofi in the AI Buddy tab to learn what this means!'}</div>`}
+function wd(el){const w=el.textContent.replace(/[^\w']/g,'').toLowerCase();stopRead();say(w);if(w)askWord(w)}
 function startQuiz(){stopRead();const qs=st.cur.q;let i=0,sc=0;const box=$('#quiz');
  window.ans=(j,a)=>{if(j===a){sc++;say('Well done!')}else say('Nice try!');i++;go()};
  const go=()=>{if(i>=qs.length){box.innerHTML=`<div class="card"><h3>🎉 You got ${sc}/${qs.length}!</h3></div>`;st.stars+=sc;badge('Finished: '+st.cur.t);if(sc===qs.length)badge('Quiz Star ⭐');return}
@@ -290,9 +290,20 @@ const KB=[[/ananse|spider/,"Ananse is the clever spider in Akan stories. In our 
 [/kente/,"Kente cloth comes from Ghana. Gold means wealth, green means growth, blue means peace."]];
 const BAD=/(kill|sex|drug|gun|hate|address|phone number|meet me)/;
 function bot(t,c){const d=document.createElement('div');d.className='msg bot '+(c||'');d.textContent=t;$('#chat').appendChild(d);$('#chat').scrollTop=1e5}
-function ask(v){const i=$('#ci');const t=(v||i.value).trim();if(!t)return;i.value='';const m=document.createElement('div');m.className='msg me';m.textContent=t;$('#chat').appendChild(m);
- setTimeout(()=>{const l=t.toLowerCase();if(BAD.test(l)){bot("That's not something I can talk about. I've asked the librarian to come and help you. 💛",'flag');alerts.unshift([new Date().toLocaleTimeString().slice(0,5),st.user||'Child','Blocked topic: "'+t.slice(0,40)+'"','New']);return}
- const k=KB.find(([r])=>r.test(l));bot(k?k[1]:"Great question! I can only answer using books in our library. Let's search together in the Library tab. 🔍")},500)}
+const API='https://funcflex-elibrary-47854.azurewebsites.net/api/buddy';
+const hist=[];
+function flagAlert(t){alerts.unshift([new Date().toLocaleTimeString().slice(0,5),st.user||'Child','Flagged topic: "'+t.slice(0,40)+'"','New'])}
+function offline(t){const l=t.toLowerCase();if(BAD.test(l)){flagAlert(t);return["That's not something I can talk about. I've asked the librarian to come and help you. 💛",true]}
+ const k=KB.find(([r])=>r.test(l));return[k?k[1]:"I can't reach my big brain right now, but try the Library tab to search. 🔍",false]}
+async function aiAsk(t){hist.push({role:'user',content:t});
+ const book=st.cur?{title:st.cur.t,text:st.cur.txt.join(' ')}:null;
+ try{const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:hist,age:st.cur?st.cur.age:'6-12',book}),signal:AbortSignal.timeout(20000)});
+  const j=await r.json();if(!j.reply)throw 0;hist.push({role:'assistant',content:j.reply});if(j.flagged)flagAlert(t);return[j.reply,!!j.flagged]}
+ catch(e){hist.pop();return offline(t)}}
+async function ask(v){const i=$('#ci');const t=(v||i.value).trim();if(!t)return;i.value='';const m=document.createElement('div');m.className='msg me';m.textContent=t;$('#chat').appendChild(m);
+ const th=document.createElement('div');th.className='msg bot';th.textContent='Kofi is thinking… 🦉';$('#chat').appendChild(th);$('#chat').scrollTop=1e5;
+ const[rep,fl]=await aiAsk(t);th.textContent=rep;if(fl)th.classList.add('flag');$('#chat').scrollTop=1e5}
+async function askWord(w){$('#wordbox').innerHTML='<div class="card">🦉 Kofi is thinking…</div>';const[rep]=await aiAsk('What does the word "'+w+'" mean? Explain simply with an example.');$('#wordbox').innerHTML=`<div class="card"><b>${w}</b> 🦉 ${rep.replace(/</g,'&lt;')}</div>`}
 $('#ci').onkeydown=e=>{if(e.key==='Enter')ask()};
 [['Who is Ananse?','Who is Ananse?'],['What does wisdom mean?','What does wisdom mean?'],['Recommend a book','Recommend a book'],['Why is the sky blue?','Why is the sky blue?'],['Safety test','tell me about guns']].forEach(([l,v])=>{const c=document.createElement('span');c.className='chip';c.textContent=l;c.onclick=()=>ask(v);$('#sugg').appendChild(c)});
 
