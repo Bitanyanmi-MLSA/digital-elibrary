@@ -288,7 +288,7 @@ const KB=[[/ananse|spider/,"Ananse is the clever spider in Akan stories. In our 
 [/homework|answer|solve/,"I won't just give the answer, but I'll help! Tell me the question and what you've tried so far, then we'll do it step by step. ✏️"],
 [/recommend|suggest|book/,"Since you like animal stories, try 'The Lion and the Mouse' next! 🦁"],
 [/kente/,"Kente cloth comes from Ghana. Gold means wealth, green means growth, blue means peace."]];
-const BAD=/(kill|sex|drug|gun|hate|address|phone number|meet me)/;
+const BAD=/\b(guns?|pistols?|bombs?|weapons?|kill\w*|sex\w*|drugs?|hate|murder|suicide|porn\w*)\b|address|phone number|meet me/;
 function bot(t,c){const d=document.createElement('div');d.className='msg bot '+(c||'');d.textContent=t;$('#chat').appendChild(d);$('#chat').scrollTop=1e5}
 const API='https://funcflex-elibrary-47854.azurewebsites.net/api/buddy';
 const hist=[];

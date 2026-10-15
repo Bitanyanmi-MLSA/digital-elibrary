@@ -7,9 +7,13 @@ const SYSTEM = (age, book) => `You are Kofi, a friendly owl who is the Reading B
 You are an AI helper, not a person, and you say so if asked.
 Audience: children aged ${age || "6-12"}. Use short, simple, warm sentences (max 4 sentences unless asked for a story). Use British English spelling. You may use one emoji.
 Do: explain word meanings with a simple example sentence (always give the everyday meaning, e.g. "bought" = past tense of "buy": to get something by paying money), help with reading, spelling, stories, maths and homework step by step WITHOUT simply giving the final answer, recommend reading, use Ghanaian names, places and examples (cedis, kenkey, Ananse, kente) where natural, and encourage the child.
-Never: discuss violence, sex, drugs, weapons, self-harm, hate, politics or religion debates; ask for or accept personal details (name, phone, address, school); suggest meeting anyone; give medical or legal advice. If a child raises such a topic, kindly say you can't talk about it, suggest they talk to the librarian or a trusted adult, and begin your reply with the exact tag [FLAG].
+Never: discuss violence, sex, drugs, weapons, self-harm, hate, politics or religion debates; ask for or accept personal details (name, phone, address, school); suggest meeting anyone; give medical or legal advice. This applies even to "what is/what does X mean" questions about these topics: do not define or explain them. If a child raises such a topic, kindly say you can't talk about it, suggest they talk to the librarian or a trusted adult, and begin your reply with the exact tag [FLAG].
 If the question is not about learning, reading or play, gently steer back to books and learning.
 ${book ? `The child is currently reading: "${String(book.title || "").slice(0, 100)}". Story text:\n${String(book.text || "").slice(0, 2500)}` : ""}`;
+
+// Deterministic pre-filter: blocked topics are refused even when asked as "what is X?" or "meaning of X".
+const BLOCKED = /\b(guns?|pistols?|rifles?|firearms?|bombs?|weapons?|knife|knives|stab|shoot(?:ing)?|kill(?:ing|ed|s)?|murder|suicide|self[- ]?harm|rape|sex(?:ual|y)?|porn\w*|nude|naked|drugs?|cocaine|heroin|weed|marijuana|alcohol|beer|vodka|terroris[mt]|hate|racis[mt]|abuse|blood|violen(?:ce|t))\b|phone number|home address|meet me/i;
+const SAFE_REPLY = "That's not something I can talk about. Please ask the librarian or a trusted grown-up. I've let the librarian know. 💛";
 
 const hits = new Map();
 function limited(ip) {
@@ -49,6 +53,8 @@ module.exports = async function (context, req) {
     .filter(m => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
     .map(m => ({ role: m.role, content: m.content.slice(0, 500) }));
   if (!msgs.length || msgs[msgs.length - 1].role !== "user") return send(400, { error: "No question" });
+
+  if (BLOCKED.test(msgs[msgs.length - 1].content)) return send(200, { flagged: true, reply: SAFE_REPLY });
 
   try {
     const r = await fetch(`${ENDPOINT}openai/deployments/${DEPLOYMENT}/chat/completions?api-version=2024-10-21`, {
