@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Digital E-Library – Client Demo</title>
+<style>
+:root{--g:#0a7d4f;--y:#fcd116;--r:#ce1126;--ink:#1f2a37;--bg:#fff8e7;--card:#fff;--rad:18px}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:18px}
+body.dys{font-family:"Comic Sans MS","Trebuchet MS",sans-serif;letter-spacing:.04em;line-height:1.8}
+body.big{font-size:22px}
+body.hc{--bg:#000;--card:#111;--ink:#fff}
+body.hc .card,body.hc .tile{border:2px solid #fff}
+body.hc .bot{background:#222;color:#fff}
+header{background:var(--g);color:#fff;padding:10px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;top:0;z-index:5;border-bottom:6px solid var(--y)}
+header h1{font-size:1.1em;margin:0;flex:1}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+button{font:inherit;border:0;border-radius:50px;padding:10px 20px;cursor:pointer;background:var(--y);color:#222;font-weight:700}
+button:hover{filter:brightness(.95)}
+nav button{background:rgba(255,255,255,.18);color:#fff;padding:8px 14px}
+nav button.on{background:var(--y);color:#222}
+main{max-width:1100px;margin:auto;padding:20px}
+.card{background:var(--card);border-radius:var(--rad);padding:20px;box-shadow:0 3px 10px #0002;margin-bottom:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}
+.tile{background:var(--card);border-radius:var(--rad);overflow:hidden;box-shadow:0 3px 10px #0002;cursor:pointer;transition:.15s}
+.tile:hover{transform:translateY(-4px)}
+.cover{height:130px;display:flex;align-items:center;justify-content:center;font-size:56px}
+.tile div.t{padding:10px 12px;font-weight:700;font-size:.9em}
+.tile small{display:block;font-weight:400;opacity:.7}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.chip{padding:6px 14px;border-radius:50px;background:#0001;cursor:pointer;font-size:.85em}
+.chip.on{background:var(--g);color:#fff}
+input[type=text],input[type=search]{font:inherit;padding:10px 16px;border-radius:50px;border:2px solid #0003;width:100%}
+select{font:inherit;padding:8px;border-radius:10px}
+.hide{display:none!important}
+.login{text-align:center;max-width:460px;margin:40px auto}
+.pad{display:grid;grid-template-columns:repeat(3,70px);gap:10px;justify-content:center;margin:14px 0}
+.pad button{height:60px;border-radius:14px;font-size:1.3em;padding:0}
+.dots{font-size:2em;letter-spacing:10px;min-height:1.4em}
+.reader p{font-size:1.2em;line-height:1.8}
+.reader .hl{background:var(--y);color:#222;border-radius:4px}
+.word{cursor:pointer}
+.chat{height:300px;overflow:auto;background:#0001;border-radius:var(--rad);padding:12px;margin-bottom:10px}
+.msg{padding:8px 14px;border-radius:16px;margin:6px 0;max-width:80%}
+.me{background:var(--g);color:#fff;margin-left:auto}
+.bot{background:#fff;color:#222}
+.flag{background:#ffe1e1;color:#900}
+.bars{display:flex;align-items:flex-end;gap:10px;height:160px}
+.bars div{flex:1;background:var(--g);border-radius:8px 8px 0 0;position:relative;min-height:4px}
+.bars span{position:absolute;bottom:-22px;left:0;right:0;text-align:center;font-size:.7em;white-space:nowrap}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+.kpi{background:var(--g);color:#fff;border-radius:var(--rad);padding:16px;text-align:center}
+.kpi b{font-size:2em;display:block}
+table{width:100%;border-collapse:collapse;font-size:.85em}
+td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
+.mem{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-width:480px}
+.mem button{height:80px;font-size:2em;background:#fff;border-radius:14px;border:3px solid var(--g);padding:0}
+.mem button.f{background:#d8f5e6}
+.mem button.m{background:var(--y);border-color:var(--y)}
+.banner{background:#222;color:#ddd;text-align:center;font-size:.75em;padding:6px}
+.sp{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.letters button{background:#fff;border:3px solid var(--g);width:56px;height:56px;border-radius:12px;font-size:1.4em;padding:0;margin:4px}
+.slot{display:inline-block;width:50px;height:56px;border-bottom:4px solid var(--g);font-size:1.6em;text-align:center;margin:3px}
+.badge{display:inline-block;padding:6px 14px;border-radius:50px;background:var(--y);color:#222;margin:3px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="banner">DEMO PROTOTYPE – sample content and simulated AI for client preview. Not the production application.</div>
+
+<header id="hdr" class="hide">
+  <h1>📚 Digital E-Library <small id="who"></small></h1>
+  <nav id="nav">
+    <button data-v="home" class="on">Library</button>
+    <button data-v="buddy">AI Buddy</button>
+    <button data-v="games">Play Zone</button>
+    <button data-v="me">My Badges</button>
+    <button data-v="staff">Staff</button>
+  </nav>
+  <button onclick="toggle('big')" title="Large text">A+</button>
+  <button onclick="toggle('dys')" title="Dyslexia-friendly">Dys</button>
+  <button onclick="toggle('hc')" title="High contrast">◐</button>
+  <button onclick="logout()">Sign out</button>
+</header>
+
+<main>
+<section id="v-login" class="card login">
+  <h1>📚 Welcome!</h1>
+  <p>Enter your library PIN.<br><small>(Demo: any 4 digits)</small></p>
+  <div class="dots" id="dots">····</div>
+  <div class="pad" id="pad"></div>
+  <div class="sp" style="justify-content:center">
+    <button onclick="login('Ama')">📷 Scan library card (QR)</button>
+  </div>
+  <p><small>No email needed. Tablets are locked to the E-Library app (kiosk mode).</small></p>
+</section>
+
+<section id="v-home" class="hide">
+  <div class="card">
+    <input type="search" id="q" placeholder="🔍 Search books, videos, lessons…">
+    <div class="chips" id="ages"></div>
+    <div class="chips" id="types"></div>
+  </div>
+  <div class="card" id="cont"></div>
+  <div class="grid" id="grid"></div>
+</section>
+
+<section id="v-reader" class="hide">
+  <div class="card reader">
+    <button onclick="stopRead();show('home')">← Back</button>
+    <h2 id="rt"></h2>
+    <div class="sp">
+      <button onclick="readAloud()">🔊 Read aloud</button>
+      <button onclick="stopRead()">⏹ Stop</button>
+      <select id="lang"><option>English</option><option>Twi (production)</option><option>Ewe (production)</option><option>Ga (production)</option></select>
+      <button onclick="startQuiz()">📝 Quiz me</button>
+    </div>
+    <div id="rb"></div>
+    <small>Tip: tap any word to hear it and see what it means.</small>
+    <div id="wordbox" style="margin-top:10px"></div>
+    <div id="quiz"></div>
+  </div>
+</section>
+
+<section id="v-buddy" class="hide">
+  <div class="card">
+    <h2>🦉 Kofi the Reading Buddy</h2>
+    <small>🤖 I'm an AI helper, not a person. Answers come only from the library. (Simulated for the demo.)</small>
+    <div class="chat" id="chat"></div>
+    <div class="sp">
+      <input type="text" id="ci" placeholder="Ask about a story or word…" style="flex:1">
+      <button onclick="ask()">Send</button>
+    </div>
+    <div class="chips" id="sugg"></div>
+  </div>
+</section>
+
+<section id="v-games" class="hide">
+  <div class="card">
+    <h2>🎮 Play Zone</h2>
+    <div class="sp">
+      <button onclick="wordGame()">🔤 Word Builder</button>
+      <button onclick="memGame()">🧿 Symbol Match</button>
+      <button onclick="proverb()">🗣 Proverb Puzzle</button>
+    </div>
+    <p><small>No ads. No purchases. No chat with strangers. A session timer keeps play balanced.</small></p>
+    <div>⏱ Time left: <b id="timer">15:00</b></div>
+  </div>
+  <div class="card" id="game">Choose a game above.</div>
+</section>
+
+<section id="v-me" class="hide">
+  <div class="card">
+    <h2>⭐ My Progress</h2>
+    <div class="kpis" id="mekp"></div>
+    <h3>Badges</h3><div id="badges"></div>
+    <h3>Favourites</h3><div class="grid" id="favs"></div>
+  </div>
+</section>
+
+<section id="v-staff" class="hide">
+  <div class="card" id="staffgate">
+    <h2>Staff dashboard</h2>
+    <p>Librarian PIN required (demo PIN: <b>0000</b>)</p>
+    <input type="text" id="spin" placeholder="PIN" style="max-width:200px">
+    <button onclick="staffIn()">Open</button>
+  </div>
+  <div id="staffbody" class="hide">
+    <div class="kpis card">
+      <div class="kpi"><b>18 / 24</b>Tablets in use</div>
+      <div class="kpi"><b>312</b>Items read this month</div>
+      <div class="kpi"><b>47 min</b>Avg session</div>
+      <div class="kpi" style="background:var(--r)"><b id="k2">2</b>Safety alerts</div>
+    </div>
+    <div class="card"><h3>Reading sessions this week</h3>
+      <div class="bars" id="bars"></div><div style="height:26px"></div></div>
+    <div class="card"><h3>Popular content</h3><table id="pop"></table></div>
+    <div class="card"><h3>🚩 Flagged AI conversations (review queue)</h3><table id="alerts"></table></div>
+    <div class="card"><h3>Tablet fleet</h3><table id="fleet"></table></div>
+    <div class="card"><h3>Content licence register (sample)</h3><table id="lic"></table></div>
+  </div>
+</section>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const COV=['#ffd6a5','#caffbf','#9bf6ff','#bdb2ff','#ffc6ff','#fdffb6'];
+const LIB=[
+{id:1,t:'Ananse and the Wisdom Pot',e:'🕷️',type:'Book',age:'6–12',src:'Original (sample)',txt:[
+"Long ago, Ananse the spider wanted to be the wisest creature in the world. He gathered all the wisdom he could find and put it in a big clay pot.",
+"\"Now I will hide it at the top of the tallest tree,\" said Ananse, \"so nobody can take it.\" He tied the pot to his belly and began to climb.",
+"But the pot kept getting in his way. Ananse struggled and slipped. Behind him, his little son Ntikuma laughed. \"Father, why not tie the pot to your back?\"",
+"Ananse was surprised. A child had thought of something he had not! In anger, he threw the pot down. It broke, and wisdom spread across the whole world.",
+"That is why wisdom belongs to everyone, and why even a small child can teach a grown-up."],
+q:[["Who gave Ananse the good idea?",["Ntikuma","A bird","The chief"],0],["Where did Ananse want to hide the pot?",["Under a rock","At the top of a tree","In the river"],1]]},
+{id:2,t:'The Tortoise and the Hare',e:'🐢',type:'Book',age:'3–6',src:'Aesop · Public domain',txt:[
+"A hare once laughed at a tortoise. \"You are so slow!\" he said.",
+"\"Let us race,\" said the tortoise. The animals gathered to watch.",
+"The hare ran far ahead, then lay down under a tree to nap. The tortoise kept walking, slowly and steadily.",
+"When the hare woke up, the tortoise was at the finish line. Slow and steady wins the race."],
+q:[["Why did the hare lose?",["He fell in a hole","He took a nap","He was slower"],1]]},
+{id:3,t:'The Lion and the Mouse',e:'🦁',type:'Book',age:'3–6',src:'Aesop · Public domain',txt:[
+"A lion caught a tiny mouse. \"Please let me go,\" squeaked the mouse. \"One day I will help you.\"",
+"The lion laughed, but let him go. Later, hunters trapped the lion in a net.",
+"The mouse heard him roar. He chewed the ropes until the lion was free.",
+"Even the smallest friend can be a great help."],
+q:[["How did the mouse help the lion?",["He chewed the ropes","He called the hunters","He ran away"],0]]},
+{id:4,t:'The Boy Who Cried Wolf',e:'🐺',type:'Book',age:'6–12',src:'Aesop · Public domain',txt:[
+"A shepherd boy was bored. \"Wolf! Wolf!\" he cried. The villagers ran to help, but there was no wolf.",
+"He did it again, and again they came. He laughed at them.",
+"Then a real wolf came. \"Wolf!\" he cried. But nobody came, because they thought he was lying again.",
+"Liars are not believed, even when they tell the truth."],
+q:[["Why did nobody come the last time?",["They were asleep","They did not believe him","They were afraid"],1]]},
+{id:5,t:'Counting Cocoa Pods',e:'🍫',type:'Lesson',age:'3–6',src:'Kolibri-style (sample)',txt:[
+"Kwame picks cocoa pods on the farm. He picks 1 pod, then 2 pods, then 3 pods.",
+"How many pods are there now? 1 + 2 + 3 = 6 pods!",
+"Can you count the pods in your own picture?"],
+q:[["1 + 2 + 3 = ?",["5","6","7"],1]]},
+{id:6,t:'Why Is the Sky Blue?',e:'🌤️',type:'Video',age:'6–12',src:'Whitelisted playlist (sample)',txt:[
+"Sunlight looks white, but it is made of many colours.",
+"When light hits the air, blue light bounces around the most. That is why we see a blue sky.",
+"At sunset the light travels farther, so we see orange and red."],
+q:[["Which colour bounces most in the air?",["Red","Blue","Green"],1]]},
+{id:7,t:'Adwoa Learns Phonics',e:'🔤',type:'Audio',age:'3–6',src:'Original (sample)',txt:[
+"A says ah, as in apple. B says buh, as in ball. C says kuh, as in cat.",
+"Say them with me: ah, buh, kuh! Great job, Adwoa!"],
+q:[["B says…",["buh","kuh","ah"],0]]},
+{id:8,t:'Science at Home: Volcano',e:'🌋',type:'Lesson',age:'12–15',src:'OER (sample)',txt:[
+"Mix baking soda and vinegar. It fizzes! This is a chemical reaction that makes carbon dioxide gas.",
+"Real volcanoes erupt because hot melted rock called magma rises to the surface."],
+q:[["What gas is made by the fizz?",["Oxygen","Carbon dioxide","Helium"],1]]},
+{id:9,t:'Young Entrepreneurs of Accra',e:'💼',type:'Book',age:'16–19',src:'Original (sample)',txt:[
+"Efua saved 20 cedis and bought soap to resell at school. By the end of the month, she had doubled it.",
+"She kept a notebook of every cedi she earned and spent. Good records helped her grow."],
+q:[["What helped Efua grow?",["Luck","Good records","A loan"],1]]},
+{id:10,t:'Kente Colours and Meaning',e:'🧵',type:'Video',age:'6–12',src:'Whitelisted playlist (sample)',txt:[
+"Kente cloth is woven in Ghana. Each colour has a meaning.",
+"Gold stands for royalty and wealth. Green stands for growth. Blue stands for peace and love."],
+q:[["Green in kente stands for…",["Growth","War","Rain"],0]]}
+];
+const AGES=['All','3–6','6–12','12–15','16–19'],TYPES=['All','Book','Lesson','Video','Audio'];
+const DEF={cedis:'Ghana money',wisdom:'knowing what is right and wise',struggled:'tried hard but found it difficult',finish:'the end of a race',shepherd:'a person who looks after sheep',magma:'hot melted rock under the ground',kente:'colourful woven cloth from Ghana',gather:'to come together',gathered:'came together',clay:'soft earth used to make pots',reaction:'when things change into something new',ananse:'the clever spider in Akan stories',pods:'the cases that hold seeds',hunters:'people who catch animals',net:'a mesh made of ropes',royalty:'kings and queens'};
+const st={age:'All',type:'All',q:'',cur:null,pin:'',user:null,read:{},fav:new Set(),badges:new Set(),stars:0};
+const alerts=[['09:14','Child #A113','Asked about violent content: blocked','Reviewed'],['10:02','Child #B207','Shared a phone number: blocked','New']];
+
+function show(v){document.querySelectorAll('main>section').forEach(s=>s.classList.add('hide'));$('#v-'+v).classList.remove('hide');
+ document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+ if(v==='home')renderHome();if(v==='me')renderMe();if(v==='staff')renderStaff();
+ if(v==='buddy'&&!$('#chat').children.length)bot("Hello! I'm Kofi 🦉 Ask me about a story you read or a hard word.");}
+function toggle(c){document.body.classList.toggle(c)}
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{stopRead();show(b.dataset.v)});
+
+function drawPad(){const p=$('#pad');p.innerHTML='';[1,2,3,4,5,6,7,8,9,'C',0,'✔'].forEach(k=>{const b=document.createElement('button');b.textContent=k;b.onclick=()=>key(k);p.appendChild(b)})}
+function key(k){if(k==='C')st.pin='';else if(k==='✔'){if(st.pin.length===4)login('Kwesi')}else if(st.pin.length<4){st.pin+=k;if(st.pin.length===4){$('#dots').textContent='●●●●';setTimeout(()=>login('Kwesi'),250);return}}
+ $('#dots').textContent=(st.pin.replace(/./g,'●')+'····').slice(0,4)}
+function login(n){st.user=n;st.pin='';$('#dots').textContent='····';$('#who').textContent='– Hi, '+n+'! 👋';$('#hdr').classList.remove('hide');startTimer();show('home')}
+function logout(){stopRead();st.user=null;$('#hdr').classList.add('hide');$('#chat').innerHTML='';clearInterval(tm);show('login')}
+let tm,secs=900;function startTimer(){secs=900;clearInterval(tm);tm=setInterval(()=>{secs--;const t=$('#timer');if(t)t.textContent=Math.floor(secs/60)+':'+String(secs%60).padStart(2,'0');if(secs<=0){clearInterval(tm);alert('Time for a reading break! 📖')}},1000)}
+
+function chips(el,arr,key){el.innerHTML='';arr.forEach(a=>{const c=document.createElement('span');c.className='chip'+(st[key]===a?' on':'');c.textContent=a;c.onclick=()=>{st[key]=a;renderHome()};el.appendChild(c)})}
+function renderHome(){chips($('#ages'),AGES,'age');chips($('#types'),TYPES,'type');
+ const ks=Object.keys(st.read),last=ks[ks.length-1];
+ $('#cont').innerHTML=last?`<b>▶ Continue reading:</b> ${LIB.find(x=>x.id==last).t} <button onclick="openBook(${last})">Continue</button>`:'<b>👋 Pick a story to start your first reading mission!</b>';
+ const q=st.q.toLowerCase();const items=LIB.filter(i=>(st.age==='All'||i.age===st.age)&&(st.type==='All'||i.type===st.type)&&i.t.toLowerCase().includes(q));
+ $('#grid').innerHTML=items.map(i=>`<div class="tile" onclick="openBook(${i.id})"><div class="cover" style="background:${COV[i.id%6]}">${i.e}</div><div class="t">${st.fav.has(i.id)?'❤️ ':''}${i.t}<small>${i.type} · Ages ${i.age}<br>${i.src}</small></div></div>`).join('')||'<p>No items found.</p>';}
+$('#q').oninput=e=>{st.q=e.target.value;renderHome()};
+
+function openBook(id){const b=LIB.find(x=>x.id==id);st.cur=b;st.read[id]=1;show('reader');
+ $('#rt').innerHTML=b.e+' '+b.t+` <button onclick="fav(${id})" id="fb">${st.fav.has(id)?'❤️':'🤍'}</button>`;
+ $('#rb').innerHTML=b.txt.map((p,i)=>`<p id="p${i}">`+p.split(' ').map(w=>`<span class="word" onclick="wd(this)">${w}</span>`).join(' ')+'</p>').join('');
+ $('#quiz').innerHTML='';$('#wordbox').textContent='';window.scrollTo(0,0)}
+function fav(id){st.fav.has(id)?st.fav.delete(id):st.fav.add(id);$('#fb').textContent=st.fav.has(id)?'❤️':'🤍'}
+function say(t,onend){if(!('speechSynthesis' in window)){if(onend)setTimeout(onend,1200);return}speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='en-GB';u.rate=.85;if(onend)u.onend=onend;speechSynthesis.speak(u)}
+let reading=0;
+function readAloud(){const ps=st.cur.txt,tok=++reading;let i=0;const next=()=>{if(tok!==reading)return;document.querySelectorAll('.reader p').forEach(p=>p.classList.remove('hl'));if(i>=ps.length)return;$('#p'+i).classList.add('hl');say(ps[i],()=>{i++;next()})};next()}
+function stopRead(){reading++;if('speechSynthesis' in window)speechSynthesis.cancel();document.querySelectorAll('.reader p').forEach(p=>p.classList.remove('hl'))}
+function wd(el){const w=el.textContent.replace(/[^\w']/g,'').toLowerCase();stopRead();say(w);$('#wordbox').innerHTML=`<div class="card"><b>${w}</b>: ${DEF[w]||'🦉 Ask Kofi in the AI Buddy tab to learn what this means!'}</div>`}
+function startQuiz(){stopRead();const qs=st.cur.q;let i=0,sc=0;const box=$('#quiz');
+ window.ans=(j,a)=>{if(j===a){sc++;say('Well done!')}else say('Nice try!');i++;go()};
+ const go=()=>{if(i>=qs.length){box.innerHTML=`<div class="card"><h3>🎉 You got ${sc}/${qs.length}!</h3></div>`;st.stars+=sc;badge('Finished: '+st.cur.t);if(sc===qs.length)badge('Quiz Star ⭐');return}
+  const [q,o,a]=qs[i];box.innerHTML=`<div class="card"><h3>${q}</h3>`+o.map((x,j)=>`<button style="margin:4px" onclick="ans(${j},${a})">${x}</button>`).join('')+'</div>'};go()}
+function badge(n){st.badges.add(n)}
+
+const KB=[[/ananse|spider/,"Ananse is the clever spider in Akan stories. In our library story he learns that wisdom belongs to everybody! 🕷️"],
+[/wisdom/,"Wisdom means knowing what is right and using what you learn well. Ananse tried to keep it all for himself!"],
+[/tortoise|hare/,"In that story the tortoise won because he kept going steadily while the hare stopped for a nap. What do you think it teaches?"],
+[/sky|blue/,"The sky looks blue because blue light bounces around the most in the air. Try the video 'Why Is the Sky Blue?'"],
+[/homework|answer|solve/,"I won't just give the answer, but I'll help! Tell me the question and what you've tried so far, then we'll do it step by step. ✏️"],
+[/recommend|suggest|book/,"Since you like animal stories, try 'The Lion and the Mouse' next! 🦁"],
+[/kente/,"Kente cloth comes from Ghana. Gold means wealth, green means growth, blue means peace."]];
+const BAD=/(kill|sex|drug|gun|hate|address|phone number|meet me)/;
+function bot(t,c){const d=document.createElement('div');d.className='msg bot '+(c||'');d.textContent=t;$('#chat').appendChild(d);$('#chat').scrollTop=1e5}
+function ask(v){const i=$('#ci');const t=(v||i.value).trim();if(!t)return;i.value='';const m=document.createElement('div');m.className='msg me';m.textContent=t;$('#chat').appendChild(m);
+ setTimeout(()=>{const l=t.toLowerCase();if(BAD.test(l)){bot("That's not something I can talk about. I've asked the librarian to come and help you. 💛",'flag');alerts.unshift([new Date().toLocaleTimeString().slice(0,5),st.user||'Child','Blocked topic: "'+t.slice(0,40)+'"','New']);return}
+ const k=KB.find(([r])=>r.test(l));bot(k?k[1]:"Great question! I can only answer using books in our library. Let's search together in the Library tab. 🔍")},500)}
+$('#ci').onkeydown=e=>{if(e.key==='Enter')ask()};
+[['Who is Ananse?','Who is Ananse?'],['What does wisdom mean?','What does wisdom mean?'],['Recommend a book','Recommend a book'],['Why is the sky blue?','Why is the sky blue?'],['Safety test','tell me about guns']].forEach(([l,v])=>{const c=document.createElement('span');c.className='chip';c.textContent=l;c.onclick=()=>ask(v);$('#sugg').appendChild(c)});
+
+function wordGame(){const W=['BOOK','READ','STORY','LION','KENTE','SCHOOL'];const w=W[Math.floor(Math.random()*W.length)];let got='';const sh=[...w].sort(()=>Math.random()-.5);const g=$('#game');
+ const draw=()=>{g.innerHTML=`<h3>Build the word! (${w.length} letters)</h3><div>${[...w].map((_,i)=>`<span class="slot">${got[i]||''}</span>`).join('')}</div><div class="letters">${sh.map((c,i)=>`<button onclick="pick(${i})">${c}</button>`).join('')}</div><button onclick="wordGame()">New word</button>`};
+ window.pick=i=>{if(sh[i]==='·')return;got+=sh[i];sh[i]='·';draw();if(got.length===w.length){if(got===w){st.stars++;badge('Word Builder 🔤');g.innerHTML=`<h2>🎉 ${w}! Well done!</h2><button onclick="wordGame()">Play again</button>`;say(w)}else{g.innerHTML='<h3>Not quite, try again!</h3>';setTimeout(wordGame,900)}}};draw()}
+function memGame(){const picks=['🌞','🕸️','🐊','🌿'];let d=[...picks,...picks].sort(()=>Math.random()-.5),open=[],done=0,tries=0;const g=$('#game');
+ const draw=()=>g.innerHTML=`<h3>Symbol Match (the full game uses real Adinkra symbols) · Tries: ${tries}</h3><div class="mem">${d.map((x,i)=>`<button class="${x==='x'?'m':open.includes(i)?'f':''}" onclick="flip(${i})">${x==='x'?'✔':open.includes(i)?x:'?'}</button>`).join('')}</div>`;
+ window.flip=i=>{if(open.length>=2||open.includes(i)||d[i]==='x')return;open.push(i);draw();if(open.length===2){tries++;const[a,b]=open;setTimeout(()=>{if(d[a]===d[b]){d[a]=d[b]='x';done++}open=[];draw();if(done===4){st.stars+=2;badge('Memory Master 🧿');g.innerHTML='<h2>🎉 All matched!</h2><button onclick="memGame()">Again</button>'}},700)}};draw()}
+function proverb(){const P=[['Wisdom is like a baobab tree; no one individual can ___ it.','embrace',['embrace','eat','paint']],['It is the calm and silent water that ___ the crocodile.','drowns',['drowns','feeds','warms']],['Knowledge is like a garden: if it is not ___, it cannot be harvested.','cultivated',['cultivated','sold','hidden']]];
+ const[p,a,o]=P[Math.floor(Math.random()*P.length)];
+ $('#game').innerHTML=`<h3>🗣 Complete the proverb</h3><p>${p}</p>`+[...o].sort(()=>Math.random()-.5).map(x=>`<button style="margin:4px" onclick="pv('${x}','${a}')">${x}</button>`).join('')+'<p id="pvr"></p>';
+ window.pv=(x,a)=>{if(x===a){$('#pvr').innerHTML='✅ Correct! <button onclick="proverb()">Next</button>';st.stars++;badge('Proverb Keeper 🗣')}else $('#pvr').textContent='Try again!'}}
+
+function renderMe(){$('#mekp').innerHTML=`<div class="kpi"><b>${Object.keys(st.read).length}</b>Items opened</div><div class="kpi"><b>${st.stars}</b>⭐ Stars</div><div class="kpi"><b>${st.badges.size}</b>Badges</div>`;
+ $('#badges').innerHTML=[...st.badges].map(b=>`<span class="badge">🏅 ${b}</span>`).join('')||'Finish a quiz or game to earn badges!';
+ $('#favs').innerHTML=[...st.fav].map(i=>{const b=LIB.find(x=>x.id===i);return `<div class="tile" onclick="openBook(${i})"><div class="cover" style="background:${COV[i%6]}">${b.e}</div><div class="t">${b.t}</div></div>`}).join('')||'<p>Tap 🤍 inside a book to save favourites.</p>'}
+
+function staffIn(){if($('#spin').value==='0000'){$('#staffgate').classList.add('hide');$('#staffbody').classList.remove('hide');renderStaff()}else alert('Wrong PIN')}
+function renderStaff(){if($('#staffbody').classList.contains('hide'))return;
+ const d=[['Mon',38],['Tue',52],['Wed',47],['Thu',61],['Fri',70],['Sat',33]];
+ $('#bars').innerHTML=d.map(([n,v])=>`<div style="height:${v/70*100}%"><span>${n} (${v})</span></div>`).join('');
+ $('#pop').innerHTML='<tr><th>Title</th><th>Reads</th><th>Avg quiz score</th></tr>'+LIB.slice(0,5).map((b,i)=>`<tr><td>${b.e} ${b.t}</td><td>${88-i*13+(st.read[b.id]?1:0)}</td><td>${90-i*4}%</td></tr>`).join('');
+ $('#alerts').innerHTML='<tr><th>Time</th><th>Child</th><th>Reason</th><th>Status</th></tr>'+alerts.map(a=>`<tr><td>${a[0]}</td><td>${a[1]}</td><td>${a[2]}</td><td>${a[3]}</td></tr>`).join('');
+ $('#k2').textContent=alerts.length;
+ $('#fleet').innerHTML='<tr><th>Tablet</th><th>Status</th><th>Battery</th><th>Mode</th></tr>'+Array.from({length:6},(_,i)=>`<tr><td>TAB-${String(i+1).padStart(2,'0')}</td><td>${i<4?'In use':'Charging'}</td><td>${[88,64,41,95,100,72][i]}%</td><td>Kiosk locked 🔒</td></tr>`).join('');
+ $('#lic').innerHTML='<tr><th>Item</th><th>Licence</th><th>Reviewed</th></tr>'+LIB.slice(0,5).map(b=>`<tr><td>${b.t}</td><td>${/Public/.test(b.src)?'Public domain':/Original/.test(b.src)?'Commissioned':'CC BY-SA'}</td><td>✔ Age-checked</td></tr>`).join('')}
+
+drawPad();
+</script>
+</body>
+</html>
