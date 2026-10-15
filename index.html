@@ -148,6 +148,7 @@ td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
     <h2>🎮 Play Zone</h2>
     <div class="sp">
       <button onclick="wordGame()">🔤 Word Builder</button>
+      <button onclick="spellGame()">🐝 Spelling Bee</button>
       <button onclick="memGame()">🧿 Symbol Match</button>
       <button onclick="proverb()">🗣 Proverb Puzzle</button>
     </div>
@@ -315,16 +316,59 @@ async function askWord(w){$('#wordbox').innerHTML='<div class="card">🦉 Kofi i
 $('#ci').onkeydown=e=>{if(e.key==='Enter')ask()};
 [['Who is Ananse?','Who is Ananse?'],['What does wisdom mean?','What does wisdom mean?'],['Recommend a book','Recommend a book'],['Why is the sky blue?','Why is the sky blue?'],['Safety test','tell me about guns']].forEach(([l,v])=>{const c=document.createElement('span');c.className='chip';c.textContent=l;c.onclick=()=>ask(v);$('#sugg').appendChild(c)});
 
-function wordGame(){const W=['BOOK','READ','STORY','LION','KENTE','SCHOOL'];const w=W[Math.floor(Math.random()*W.length)];let got='';const sh=[...w].sort(()=>Math.random()-.5);const g=$('#game');
- const draw=()=>{g.innerHTML=`<h3>Build the word! (${w.length} letters)</h3><div>${[...w].map((_,i)=>`<span class="slot">${got[i]||''}</span>`).join('')}</div><div class="letters">${sh.map((c,i)=>`<button onclick="pick(${i})">${c}</button>`).join('')}</div><button onclick="wordGame()">New word</button>`};
- window.pick=i=>{if(sh[i]==='·')return;got+=sh[i];sh[i]='·';draw();if(got.length===w.length){if(got===w){st.stars++;badge('Word Builder 🔤');g.innerHTML=`<h2>🎉 ${w}! Well done!</h2><button onclick="wordGame()">Play again</button>`;say(w)}else{g.innerHTML='<h3>Not quite, try again!</h3>';setTimeout(wordGame,900)}}};draw()}
-function memGame(){const picks=['🌞','🕸️','🐊','🌿'];let d=[...picks,...picks].sort(()=>Math.random()-.5),open=[],done=0,tries=0;const g=$('#game');
- const draw=()=>g.innerHTML=`<h3>Symbol Match (the full game uses real Adinkra symbols) · Tries: ${tries}</h3><div class="mem">${d.map((x,i)=>`<button class="${x==='x'?'m':open.includes(i)?'f':''}" onclick="flip(${i})">${x==='x'?'✔':open.includes(i)?x:'?'}</button>`).join('')}</div>`;
- window.flip=i=>{if(open.length>=2||open.includes(i)||d[i]==='x')return;open.push(i);draw();if(open.length===2){tries++;const[a,b]=open;setTimeout(()=>{if(d[a]===d[b]){d[a]=d[b]='x';done++}open=[];draw();if(done===4){st.stars+=2;badge('Memory Master 🧿');g.innerHTML='<h2>🎉 All matched!</h2><button onclick="memGame()">Again</button>'}},700)}};draw()}
-function proverb(){const P=[['Wisdom is like a baobab tree; no one individual can ___ it.','embrace',['embrace','eat','paint']],['It is the calm and silent water that ___ the crocodile.','drowns',['drowns','feeds','warms']],['Knowledge is like a garden: if it is not ___, it cannot be harvested.','cultivated',['cultivated','sold','hidden']]];
- const[p,a,o]=P[Math.floor(Math.random()*P.length)];
- $('#game').innerHTML=`<h3>🗣 Complete the proverb</h3><p>${p}</p>`+[...o].sort(()=>Math.random()-.5).map(x=>`<button style="margin:4px" onclick="pv('${x}','${a}')">${x}</button>`).join('')+'<p id="pvr"></p>';
- window.pv=(x,a)=>{if(x===a){$('#pvr').innerHTML='✅ Correct! <button onclick="proverb()">Next</button>';st.stars++;badge('Proverb Keeper 🗣')}else $('#pvr').textContent='Try again!'}}
+/* ===== Play Zone: large banks, no repeats until a bank is exhausted ===== */
+const WORDS={
+ easy:'cat|a small pet that purrs,dog|a pet that barks,sun|it shines in the day,hat|you wear it on your head,pen|you write with it,bed|you sleep in it,cup|you drink from it,bag|you carry books in it,fish|it swims in water,book|you read it,tree|it has leaves and a trunk,milk|a white drink,rain|water falling from clouds,moon|it shines at night,frog|it hops and says ribbit,duck|a bird that quacks,ball|you kick or throw it,cake|a sweet birthday treat,road|cars drive on it,bird|it can fly,hand|it has five fingers,star|it twinkles in the sky,door|you open it to go in,bread|you eat it with butter,pig|a farm animal that oinks,goat|a farm animal that says meh,hen|a bird that lays eggs,egg|a hen lays it,ant|a tiny insect,kite|it flies on a string,map|it shows where places are,rice|jollof is made with it,corn|maize,yam|a root food eaten in Ghana,home|where you live,farm|where crops grow,king|a male ruler,boat|it floats on water,coin|money you can hold,leaf|part of a tree,nose|you smell with it,foot|you walk on it',
+ medium:'school|where children learn,teacher|someone who teaches,library|a place full of books,market|where people buy and sell,banana|a long yellow fruit,orange|a round juicy fruit,family|parents and children,friend|someone you like,garden|where flowers grow,window|you look through it,kitchen|where food is cooked,pencil|you write and draw with it,elephant|the biggest land animal,giraffe|an animal with a long neck,monkey|it climbs trees,rabbit|a hopping animal with long ears,butter|spread on bread,river|water flowing to the sea,mountain|very high land,village|a small town,cloud|white shape in the sky,thunder|loud noise in a storm,rainbow|colours after rain,morning|start of the day,evening|end of the day,doctor|a person who heals the sick,nurse|helps the doctor,farmer|grows food,driver|drives a bus,singer|sings songs,painter|paints pictures,football|a game with a round ball,drum|you beat it to make music,basket|you carry things in it,pepper|a hot spice,tomato|a red fruit used in stew,plantain|a banana you cook,cassava|a root made into gari,cocoa|chocolate is made from it,sunshine|light from the sun,brother|a boy in your family,sister|a girl in your family,grandma|your parent\'s mother,uniform|clothes for school,science|study of the world,history|stories of the past,music|songs and sounds,sports|games like running and football',
+ hard:'adventure|an exciting journey,beautiful|very pretty,knowledge|what you learn,generous|happy to share,courage|bravery,responsible|you can be trusted,community|people living together,festival|a big celebration,traditional|from long ago,important|matters a lot,imagination|picturing things in your mind,difficult|not easy,wonderful|really great,mathematics|the study of numbers,geography|the study of places,dictionary|a book of word meanings,telescope|it makes faraway stars look near,microscope|it makes tiny things look big,electricity|power for lights,environment|nature around us,celebration|a joyful event,determination|never giving up,independence|being free,government|people who run a country,president|leader of a country,agriculture|farming,kindness|being nice to others,friendship|being good friends,discovery|finding something new,ingredient|part of a recipe,temperature|how hot or cold,vocabulary|the words you know,pronunciation|how you say a word,punctuation|full stops and commas,chocolate|a sweet made from cocoa,education|learning at school,opportunity|a good chance,protect|keep safe,achieve|succeed at something,volcano|a mountain that erupts,planet|Earth is one,equator|line around the middle of Earth,continent|Africa is one'
+};
+const PROVERBS=[
+['Wisdom is like a baobab tree; no one individual can ___ it.','embrace',['embrace','eat','paint']],
+['It is the calm and silent water that ___ the crocodile.','drowns',['drowns','feeds','warms']],
+['Knowledge is like a garden: if it is not ___, it cannot be harvested.','cultivated',['cultivated','sold','hidden']],
+['A single bracelet does not ___.','jingle',['jingle','shine','break']],
+['When the music changes, so does the ___.','dance',['dance','door','dress']],
+['However long the night, the ___ is sure to come.','dawn',['dawn','rain','wind']],
+['Little by little, a bird builds its ___.','nest',['nest','wing','song']],
+['The one who asks questions does not lose his ___.','way',['way','coat','voice']],
+['Unity is ___.','strength',['strength','heavy','quiet']],
+['A child who is carried on the back does not know how ___ the road is.','far',['far','wet','red']],
+['Rain does not fall on one ___ alone.','roof',['roof','dog','hill']],
+['Two heads are better than ___.','one',['one','none','ten']],
+['A good name is better than ___.','riches',['riches','sleep','soup']],
+['He who learns, teaches ___.','best',['best','less','late']],
+['The lion does not turn around when a small dog ___.','barks',['barks','sings','runs']],
+['If you want to go fast, go alone. If you want to go far, go ___.','together',['together','slowly','home']],
+['Hold a true friend with both ___.','hands',['hands','eyes','feet']],
+['Smooth seas do not make skilful ___.','sailors',['sailors','farmers','kings']],
+['Patience is the key to ___.','joy',['joy','doors','noise']],
+['A tree is known by its ___.','fruit',['fruit','shade','roots']],
+['The frog does not drink up the pond in which it ___.','lives',['lives','sings','jumps']],
+['Education is the key that opens the ___.','future',['future','fridge','shop']],
+['Treat the earth well; it was not given to you by your parents, it was loaned to you by your ___.','children',['children','chiefs','friends']],
+['The thief never ___ his own mother.','robs',['robs','sees','calls']]];
+const SYMS='🌞 🕸️ 🐊 🌿 🌙 🐚 🦁 🐘 🦒 🐢 🦅 🐝 🥁 🍌 🥭 🌴 ⭐ 🌈 ⚽ 🚌 🐟 🍚 🦋 🐸 🌻 🪘 🏺 🐆 🦓 🍍'.split(' ');
+const seen={};
+function pickUnique(key,arr){seen[key]=seen[key]||new Set();if(seen[key].size>=arr.length)seen[key].clear();let i;do{i=Math.floor(Math.random()*arr.length)}while(seen[key].has(i));seen[key].add(i);return arr[i]}
+function bank(lv){return WORDS[lv].split(',').map(x=>x.split('|'))}
+const gs={lv:'easy',mlv:'easy'};
+function lvBar(fn,key){return `<div class="chips">${['easy','medium','hard'].map(l=>`<span class="chip ${gs[key]===l?'on':''}" onclick="gs['${key}']='${l}';${fn}()">${{easy:'⭐ Easy',medium:'⭐⭐ Medium',hard:'⭐⭐⭐ Hard'}[l]}</span>`).join('')}</div>`}
+function wordGame(){const[w0,hint]=pickUnique('w'+gs.lv,bank(gs.lv));const w=w0.toUpperCase();let got='';const sh=[...w].sort(()=>Math.random()-.5);const g=$('#game');
+ const total=WORDS.easy.split(',').length+WORDS.medium.split(',').length+WORDS.hard.split(',').length;
+ const draw=()=>{g.innerHTML=`<h3>🔤 Word Builder</h3><small>${total}+ words · pick a level</small>${lvBar('wordGame','lv')}<p>💡 Hint: <b>${hint}</b> (${w.length} letters) <button onclick="say('${w0}')">🔊</button></p><div>${[...w].map((_,i)=>`<span class="slot">${got[i]||''}</span>`).join('')}</div><div class="letters">${sh.map((c,i)=>`<button onclick="pick(${i})">${c}</button>`).join('')}</div><button onclick="wordGame()">Skip ➜</button> <button onclick="got='';wordGameReset()">Clear</button>`};
+ window.wordGameReset=()=>{got='';sh.splice(0,sh.length,...[...w].sort(()=>Math.random()-.5));draw()};
+ window.pick=i=>{if(sh[i]==='·')return;got+=sh[i];sh[i]='·';draw();if(got.length===w.length){if(got===w){st.stars++;badge('Word Builder 🔤');g.innerHTML=`<h2>🎉 ${w}! Well done!</h2><p>${hint}</p><button onclick="wordGame()">Next word ➜</button>`;say(w0)}else{g.innerHTML='<h3>Not quite, try again!</h3>';setTimeout(()=>wordGameReset(),900)}}};draw()}
+function spellGame(){const[w,hint]=pickUnique('s'+gs.lv,bank(gs.lv));const g=$('#game');
+ g.innerHTML=`<h3>🐝 Spelling Bee</h3>${lvBar('spellGame','lv')}<p>Listen and type the word.</p><button onclick="say('${w}')">🔊 Hear word</button> <button onclick="say('${hint.replace(/'/g,'')}')">💡 Hear hint</button><p><input type="text" id="sp" placeholder="Type here" style="max-width:260px" autocomplete="off" autocapitalize="off"> <button id="spb">Check</button></p><p id="spr"></p>`;
+ setTimeout(()=>say(w),200);
+ const chk=()=>{const v=$('#sp').value.trim().toLowerCase();if(!v)return;if(v===w){st.stars++;badge('Spelling Bee 🐝');$('#spr').innerHTML=`✅ Correct! <b>${w}</b> <button onclick="spellGame()">Next ➜</button>`}else $('#spr').textContent='Not quite. Listen again and try!'};
+ $('#spb').onclick=chk;$('#sp').onkeydown=e=>{if(e.key==='Enter')chk()};$('#sp').focus()}
+function memGame(){const n={easy:4,medium:6,hard:8}[gs.mlv];const picks=[...SYMS].sort(()=>Math.random()-.5).slice(0,n);let d=[...picks,...picks].sort(()=>Math.random()-.5),open=[],done=0,tries=0;const g=$('#game');
+ const draw=()=>g.innerHTML=`<h3>🧿 Symbol Match · Tries: ${tries}</h3>${lvBar('memGame','mlv')}<div class="mem" style="grid-template-columns:repeat(4,1fr)">${d.map((x,i)=>`<button class="${x==='x'?'m':open.includes(i)?'f':''}" onclick="flip(${i})">${x==='x'?'✔':open.includes(i)?x:'?'}</button>`).join('')}</div>`;
+ window.flip=i=>{if(open.length>=2||open.includes(i)||d[i]==='x')return;open.push(i);draw();if(open.length===2){tries++;const[a,b]=open;setTimeout(()=>{if(d[a]===d[b]){d[a]=d[b]='x';done++}open=[];draw();if(done===n){st.stars+=2;badge('Memory Master 🧿');g.innerHTML=`<h2>🎉 All matched in ${tries} tries!</h2><button onclick="memGame()">Again</button>`}},700)}};draw()}
+function proverb(){const[p,a,o]=pickUnique('p',PROVERBS);
+ $('#game').innerHTML=`<h3>🗣 Complete the proverb <small>(${PROVERBS.length} proverbs)</small></h3><p>${p}</p>`+[...o].sort(()=>Math.random()-.5).map(x=>`<button style="margin:4px" onclick="pv('${x}','${a}')">${x}</button>`).join('')+'<p id="pvr"></p>';
+ window.pv=(x,a)=>{if(x===a){$('#pvr').innerHTML='✅ Correct! <button onclick="proverb()">Next ➜</button>';st.stars++;badge('Proverb Keeper 🗣')}else $('#pvr').textContent='Try again!'}}
 
 function renderMe(){$('#mekp').innerHTML=`<div class="kpi"><b>${Object.keys(st.read).length}</b>Items opened</div><div class="kpi"><b>${st.stars}</b>⭐ Stars</div><div class="kpi"><b>${st.badges.size}</b>Badges</div>`;
  $('#badges').innerHTML=[...st.badges].map(b=>`<span class="badge">🏅 ${b}</span>`).join('')||'Finish a quiz or game to earn badges!';
