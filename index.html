@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Digital E-Library – Client Demo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a7d4f">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="E-Library">
 <style>
 :root{--g:#0a7d4f;--y:#fcd116;--r:#ce1126;--ink:#1f2a37;--bg:#fff8e7;--card:#fff;--rad:18px}
 *{box-sizing:border-box}
@@ -81,6 +88,7 @@ td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
   <button onclick="toggle('dys')" title="Dyslexia-friendly">Dys</button>
   <button onclick="toggle('hc')" title="High contrast">◐</button>
   <button onclick="logout()">Sign out</button>
+  <button id="inst" class="hide" onclick="installApp()">⬇ Install app</button>
 </header>
 
 <main>
@@ -333,6 +341,12 @@ function renderStaff(){if($('#staffbody').classList.contains('hide'))return;
  $('#lic').innerHTML='<tr><th>Item</th><th>Licence</th><th>Reviewed</th></tr>'+LIB.slice(0,5).map(b=>`<tr><td>${b.t}</td><td>${/Public/.test(b.src)?'Public domain':/Original/.test(b.src)?'Commissioned':'CC BY-SA'}</td><td>✔ Age-checked</td></tr>`).join('')}
 
 drawPad();
+
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+let dip=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();dip=e;$('#inst').classList.remove('hide')});
+addEventListener('appinstalled',()=>{dip=null;$('#inst').classList.add('hide')});
+async function installApp(){if(!dip)return;dip.prompt();await dip.userChoice;dip=null;$('#inst').classList.add('hide')}
 </script>
 </body>
 </html>
