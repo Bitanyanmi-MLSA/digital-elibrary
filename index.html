@@ -283,7 +283,7 @@ function key(k){if(k==='C')st.pin='';else if(k==='✔'){if(st.pin.length===4)doL
 async function doLogin(){const code=st.pin;st.pin='';$('#lerr').textContent='';
  try{const j=await api('/lib/login',{method:'POST',body:JSON.stringify({code})});token=j.token;st.code=code;localStorage.setItem('elib-session',JSON.stringify({token,name:j.name,code}));enter(j.name)}
  catch(e){$('#dots').textContent='····';$('#lerr').textContent=e.status===undefined?'Cannot reach the library. Check your internet.':e.message}}
-function enter(n){restore();st.user=n;$('#dots').textContent='····';$('#who').textContent='– Hi, '+n+'! 👋';$('#hdr').classList.remove('hide');startTimer();show('home')}
+function enter(n){restore();st.user=n;track(false);$('#dots').textContent='····';$('#who').textContent='– Hi, '+n+'! 👋';$('#hdr').classList.remove('hide');startTimer();show('home')}
 function logout(msg){if(typeof msg!=='string')track(false,true);stopRead();hist.length=0;st.user=null;st.code=null;token=null;st.cur=null;localStorage.removeItem('elib-session');$('#hdr').classList.add('hide');$('#chat').innerHTML='';clearInterval(tm);show('login');$('#lerr').textContent=typeof msg==='string'?msg:''}
 function resume(){try{const s=JSON.parse(localStorage.getItem('elib-session')||'null');if(!s)return;const p=JSON.parse(atob(s.token.split('.')[0].replace(/-/g,'+').replace(/_/g,'/')));if(p.exp<Date.now())return localStorage.removeItem('elib-session');token=s.token;st.code=s.code;enter(s.name)}catch(e){}}
 let tm,secs=900;function startTimer(){secs=900;clearInterval(tm);tm=setInterval(()=>{secs--;const t=$('#timer');if(t)t.textContent=Math.floor(secs/60)+':'+String(secs%60).padStart(2,'0');if(secs<=0){clearInterval(tm);alert('Time for a reading break! 📖')}},1000)}
