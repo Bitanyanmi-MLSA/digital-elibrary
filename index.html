@@ -89,7 +89,7 @@ td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
 </header>
 
 <main>
-<section id="v-login" class="card login">
+<div id="offb" class="card hide" style="background:#fff3cd;text-align:center">📴 You're offline. Books you opened before are still available.</div><section id="v-login" class="card login">
   <h1>📚 Welcome!</h1>
   <p>Enter your 4-digit library code.<br><small>Your librarian gives you this code.</small></p>
   <div class="dots" id="dots">····</div>
@@ -252,10 +252,17 @@ const SHELVES=['Starter Stories','Fables & Folktales','Animals & Nature','Advent
 const PAGE=6;
 let token=null;
 
+const OFFLINE_RE=/^\/lib\/(text|catalog|discover)\?/;
 async function api(path,opts={}){
- const r=await fetch(BASE+path,{...opts,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(opts.headers||{})},signal:AbortSignal.timeout(30000)});
+ const cacheable=OFFLINE_RE.test(path)&&'caches' in window,ck=new Request(BASE+path);
+ let r;
+ try{r=await fetch(BASE+path,{...opts,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(opts.headers||{})},signal:AbortSignal.timeout(30000)})}
+ catch(e){if(cacheable){const c=await (await caches.open('elib-data')).match(ck);if(c)return c.json()}throw e}
  if(r.status===401&&token&&!opts.admin){logout('Please sign in again.')}
+ if(cacheable&&r.ok)caches.open('elib-data').then(c=>c.put(ck,r.clone())).catch(()=>{});
  const j=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(j.error||j.reply||'Request failed'),{status:r.status});return j}
+addEventListener('offline',()=>{const b=document.getElementById('offb');if(b)b.classList.remove('hide')});
+addEventListener('online',()=>{const b=document.getElementById('offb');if(b)b.classList.add('hide')});
 function pkey(){return 'elib-'+st.code}
 function save(){if(!st.code)return;try{localStorage.setItem(pkey(),JSON.stringify({read:st.read,fav:[...st.fav],badges:[...st.badges],stars:st.stars,meta:st.meta}))}catch(e){}}
 function restore(){try{const d=JSON.parse(localStorage.getItem(pkey())||'{}');st.read=d.read||{};st.fav=new Set(d.fav||[]);st.badges=new Set(d.badges||[]);st.stars=d.stars||0;st.meta=d.meta||{}}catch(e){}}
@@ -440,6 +447,7 @@ async function renderStaff(){if($('#staffbody').classList.contains('hide'))retur
  catch(e){if(e.status===401)staffOut()}}
 
 drawPad();
+if(!navigator.onLine)$('#offb').classList.remove('hide');
 setInterval(()=>{if(adminPass&&document.visibilityState==='visible')renderStaff()},30000);
 resume();
 
