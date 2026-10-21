@@ -13,6 +13,7 @@ const SHELVES = {
 const coverOf = id => `https://www.gutenberg.org/cache/epub/${id}/pg${id}.cover.medium.jpg`;
 const shelfBook = (shelf, [id, title, author]) => ({ id, title, author, cover: coverOf(id), subjects: [shelf] });
 const SESSION_MS = 12 * 3600 * 1000;
+const ONLINE_MS = 150 * 1000; // heartbeat is every 60s
 const textCache = new Map();
 
 const safeText = (s, n) => String(s || "").slice(0, n);
@@ -114,7 +115,8 @@ module.exports = async function (context, req) {
       const code = String(body.code || "");
       const e = codeOk(code) && await T.get("codes", "code", code);
       if (!e || !e.active) return send(401, { error: "That code is not valid. Please check with your librarian." });
-      await T.merge("codes", "code", code, { lastSeen: new Date().toISOString(), sessions: (e.sessions || 0) + 1 });
+      const now = new Date().toISOString();
+      await T.merge("codes", "code", code, { lastSeen: now, sessionStart: now, online: true, sessions: (e.sessions || 0) + 1 });
       return send(200, { name: e.name, token: sign({ c: code, n: e.name, exp: Date.now() + SESSION_MS }) });
     }
 
@@ -126,7 +128,10 @@ module.exports = async function (context, req) {
       if (op === "list") {
         const rows = (await T.list("codes", "code")).map(e => ({
           code: e.RowKey, name: e.name, active: !!e.active, created: e.created, lastSeen: e.lastSeen || "",
-          sessions: e.sessions || 0, reads: e.reads || 0, stars: e.stars || 0
+          sessions: e.sessions || 0, reads: e.reads || 0, stars: e.stars || 0,
+          totalSecs: e.totalSecs || 0,
+          online: !!e.online && !!e.active && Date.now() - Date.parse(e.lastSeen || 0) < ONLINE_MS,
+          sessionSecs: e.sessionStart && e.lastSeen ? Math.max(0, Math.round((Date.parse(e.lastSeen) - Date.parse(e.sessionStart)) / 1000)) : 0
         })).sort((a, b) => a.name.localeCompare(b.name));
         const alerts = (await T.list("alerts", "alert")).map(a => ({ id: a.RowKey, time: a.time, name: a.name, text: a.text, reviewed: !!a.reviewed }))
           .sort((a, b) => b.time.localeCompare(a.time)).slice(0, 50);
@@ -158,11 +163,23 @@ module.exports = async function (context, req) {
 
     if (action === "track") {
       const e = await T.get("codes", "code", s.c);
-      if (e) await T.merge("codes", "code", s.c, {
-        reads: (e.reads || 0) + (body.read ? 1 : 0),
-        stars: Math.max(e.stars || 0, Math.min(parseInt(body.stars, 10) || 0, 100000)),
-        lastSeen: new Date().toISOString()
-      });
+      if (e) {
+        const now = Date.now();
+        const last = Date.parse(e.lastSeen || 0) || 0;
+        const gap = now - last;
+        // Count time only between heartbeats close together; longer gaps mean the app was closed.
+        const add = e.online && gap > 0 && gap < ONLINE_MS ? Math.round(gap / 1000) : 0;
+        const fresh = !e.online || gap >= ONLINE_MS;
+        const upd = {
+          reads: (e.reads || 0) + (body.read ? 1 : 0),
+          stars: Math.max(e.stars || 0, Math.min(parseInt(body.stars, 10) || 0, 100000)),
+          lastSeen: new Date(now).toISOString(),
+          totalSecs: (e.totalSecs || 0) + add,
+          online: !body.logout
+        };
+        if (fresh) upd.sessionStart = upd.lastSeen;
+        await T.merge("codes", "code", s.c, upd);
+      }
       return send(200, { ok: true });
     }
     if (action === "catalog") return send(200, await catalog(req.query));

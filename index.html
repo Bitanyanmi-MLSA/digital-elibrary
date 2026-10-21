@@ -259,7 +259,9 @@ async function api(path,opts={}){
 function pkey(){return 'elib-'+st.code}
 function save(){if(!st.code)return;try{localStorage.setItem(pkey(),JSON.stringify({read:st.read,fav:[...st.fav],badges:[...st.badges],stars:st.stars,meta:st.meta}))}catch(e){}}
 function restore(){try{const d=JSON.parse(localStorage.getItem(pkey())||'{}');st.read=d.read||{};st.fav=new Set(d.fav||[]);st.badges=new Set(d.badges||[]);st.stars=d.stars||0;st.meta=d.meta||{}}catch(e){}}
-function track(read){if(token)api('/lib/track',{method:'POST',body:JSON.stringify({read:!!read,stars:st.stars})}).catch(()=>{})}
+function track(read,logout){if(token)api('/lib/track',{method:'POST',keepalive:true,body:JSON.stringify({read:!!read,stars:st.stars,logout:!!logout})}).catch(()=>{})}
+setInterval(()=>{if(token&&document.visibilityState==='visible')track(false)},60000);
+document.addEventListener('visibilitychange',()=>{if(token&&document.visibilityState==='visible')track(false)});
 
 function show(v){document.querySelectorAll('main>section').forEach(s=>s.classList.add('hide'));$('#v-'+v).classList.remove('hide');
  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
@@ -275,7 +277,7 @@ async function doLogin(){const code=st.pin;st.pin='';$('#lerr').textContent='';
  try{const j=await api('/lib/login',{method:'POST',body:JSON.stringify({code})});token=j.token;st.code=code;localStorage.setItem('elib-session',JSON.stringify({token,name:j.name,code}));enter(j.name)}
  catch(e){$('#dots').textContent='····';$('#lerr').textContent=e.status===undefined?'Cannot reach the library. Check your internet.':e.message}}
 function enter(n){restore();st.user=n;$('#dots').textContent='····';$('#who').textContent='– Hi, '+n+'! 👋';$('#hdr').classList.remove('hide');startTimer();show('home')}
-function logout(msg){stopRead();hist.length=0;st.user=null;st.code=null;token=null;st.cur=null;localStorage.removeItem('elib-session');$('#hdr').classList.add('hide');$('#chat').innerHTML='';clearInterval(tm);show('login');$('#lerr').textContent=typeof msg==='string'?msg:''}
+function logout(msg){if(typeof msg!=='string')track(false,true);stopRead();hist.length=0;st.user=null;st.code=null;token=null;st.cur=null;localStorage.removeItem('elib-session');$('#hdr').classList.add('hide');$('#chat').innerHTML='';clearInterval(tm);show('login');$('#lerr').textContent=typeof msg==='string'?msg:''}
 function resume(){try{const s=JSON.parse(localStorage.getItem('elib-session')||'null');if(!s)return;const p=JSON.parse(atob(s.token.split('.')[0].replace(/-/g,'+').replace(/_/g,'/')));if(p.exp<Date.now())return localStorage.removeItem('elib-session');token=s.token;st.code=s.code;enter(s.name)}catch(e){}}
 let tm,secs=900;function startTimer(){secs=900;clearInterval(tm);tm=setInterval(()=>{secs--;const t=$('#timer');if(t)t.textContent=Math.floor(secs/60)+':'+String(secs%60).padStart(2,'0');if(secs<=0){clearInterval(tm);alert('Time for a reading break! 📖')}},1000)}
 
@@ -430,13 +432,15 @@ async function reviewAlert(id){await admin({op:'review',id});renderStaff()}
 async function renderStaff(){if($('#staffbody').classList.contains('hide'))return;
  try{const j=await admin({op:'list'});
   const act=j.codes.filter(c=>c.active).length,newA=j.alerts.filter(a=>!a.reviewed).length;
-  $('#akpi').innerHTML=`<div class="kpi"><b>${act}</b>Active codes</div><div class="kpi"><b>${j.codes.reduce((s,c)=>s+c.reads,0)}</b>Books opened</div><div class="kpi"><b>${j.codes.reduce((s,c)=>s+c.sessions,0)}</b>Sign-ins</div><div class="kpi" style="background:var(--r)"><b>${newA}</b>Safety alerts</div>`;
+  const dur=s=>{s=Math.round(s||0);const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?h+'h '+m+'m':m?m+'m':(s?'<1m':'0m')};
+  $('#akpi').innerHTML=`<div class="kpi"><b>${act}</b>Active codes</div><div class="kpi"><b>${j.codes.reduce((s,c)=>s+c.reads,0)}</b>Books opened</div><div class="kpi"><b>${j.codes.reduce((s,c)=>s+c.sessions,0)}</b>Sign-ins</div><div class="kpi" style="background:var(--r)"><b>${newA}</b>Safety alerts</div><div class="kpi"><b>${j.codes.filter(c=>c.online).length}</b>🟢 Online now</div><div class="kpi"><b>${dur(j.codes.reduce((s,c)=>s+c.totalSecs,0))}</b>Total time</div>`;
   const d=s=>s?new Date(s).toLocaleString([], {dateStyle:'short',timeStyle:'short'}):'—';
-  $('#codes').innerHTML='<tr><th>Code</th><th>Learner</th><th>Status</th><th>Last seen</th><th>Sign-ins</th><th>Books</th><th>⭐</th><th></th></tr>'+(j.codes.map(c=>`<tr><td><b>${c.code}</b></td><td>${esc(c.name)}</td><td>${c.active?'✅ Active':'⛔ Revoked'}</td><td>${d(c.lastSeen)}</td><td>${c.sessions}</td><td>${c.reads}</td><td>${c.stars}</td><td>${c.active?`<button onclick="codeOp('revoke','${c.code}')">Revoke</button>`:`<button onclick="codeOp('restore','${c.code}')">Restore</button>`} <button style="background:#eee" onclick="codeOp('delete','${c.code}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="8">No codes yet. Create one above.</td></tr>');
+  $('#codes').innerHTML='<tr><th>Code</th><th>Learner</th><th>Status</th><th>Online</th><th>This session</th><th>Total time</th><th>Last seen</th><th>Sign-ins</th><th>Books</th><th>⭐</th><th></th></tr>'+(j.codes.map(c=>`<tr><td><b>${c.code}</b></td><td>${esc(c.name)}</td><td>${c.active?'✅ Active':'⛔ Revoked'}</td><td>${c.online?'🟢 Online':'⚪ Offline'}</td><td>${c.online?dur(c.sessionSecs):'—'}</td><td>${dur(c.totalSecs)}</td><td>${d(c.lastSeen)}</td><td>${c.sessions}</td><td>${c.reads}</td><td>${c.stars}</td><td>${c.active?`<button onclick="codeOp('revoke','${c.code}')">Revoke</button>`:`<button onclick="codeOp('restore','${c.code}')">Restore</button>`} <button style="background:#eee" onclick="codeOp('delete','${c.code}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="11">No codes yet. Create one above.</td></tr>');
   $('#alerts').innerHTML='<tr><th>Time</th><th>Learner</th><th>Question</th><th>Status</th></tr>'+(j.alerts.map(a=>`<tr><td>${d(a.time)}</td><td>${esc(a.name)}</td><td>${esc(a.text)}</td><td>${a.reviewed?'Reviewed':`<button onclick="reviewAlert('${a.id}')">Mark reviewed</button>`}</td></tr>`).join('')||'<tr><td colspan="4">No flagged conversations.</td></tr>')}
  catch(e){if(e.status===401)staffOut()}}
 
 drawPad();
+setInterval(()=>{if(adminPass&&document.visibilityState==='visible')renderStaff()},30000);
 resume();
 
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
