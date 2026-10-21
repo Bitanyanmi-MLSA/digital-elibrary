@@ -120,8 +120,8 @@ td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
       <button id="askbtn" class="hide" onclick="show('buddy')">🦉 Ask Kofi about this book</button>
     </div>
     <div id="rb"></div>
-    <div class="sp hide" id="pager" style="justify-content:space-between;margin:12px 0">
-      <button onclick="gotoPage(-1)">← Previous</button><b id="pgno"></b><button onclick="gotoPage(1)">Next →</button>
+    <div class="sp hide" id="pager" style="justify-content:center;margin:12px 0;position:sticky;bottom:0;background:var(--card);padding:6px">
+      <b id="pgno"></b>
     </div>
     <small>Tip: tap any word to hear it and see what it means.</small>
     <div id="wordbox" style="margin-top:10px"></div>
@@ -319,23 +319,37 @@ function openBook(id){const b=LIB.find(x=>x.id==id);st.cur=b;st.read[id]=1;save(
  $('#rt').innerHTML=b.e+' '+b.t+` <button onclick="fav(${id})" id="fb">${st.fav.has(id)?'❤️':'🤍'}</button>`;
  $('#rb').innerHTML=paras(b.txt);
  $('#quiz').innerHTML='';$('#wordbox').textContent='';window.scrollTo(0,0)}
-function paras(ps){return ps.map((p,i)=>`<p id="p${i}">`+esc(p).split(' ').map(w=>`<span class="word" onclick="wd(this)">${w}</span>`).join(' ')+'</p>').join('')}
+function paras(ps,off=0){return ps.map((p,i)=>`<p id="p${off+i}">`+esc(p).split(' ').map(w=>`<span class="word" onclick="wd(this)">${w}</span>`).join(' ')+'</p>').join('')}
 async function openRemote(n){const id='g'+n;show('reader');stopRead();$('#rt').textContent='⏳ Opening book…';$('#rb').innerHTML='';$('#pager').classList.add('hide');$('#quiz').innerHTML='';$('#wordbox').textContent='';
  try{const j=await api('/lib/text?id='+n);
-  st.cur={id,t:j.title,e:'📖',age:'6-12',remote:true,all:j.paragraphs,page:Math.min((st.meta[id]&&st.meta[id].page)||0,Math.max(0,Math.ceil(j.paragraphs.length/PAGE)-1)),txt:[]};
+  st.cur={id,t:j.title,e:'📖',age:'6-12',remote:true,all:j.paragraphs,page:Math.min((st.meta[id]&&st.meta[id].page)||0,Math.max(0,j.paragraphs.length-1)),txt:[]};
   st.meta[id]={t:j.title,id:n,page:st.cur.page};st.read[id]=1;save();track(true);
   $('#quizbtn').classList.add('hide');$('#askbtn').classList.remove('hide');
   $('#rt').innerHTML=`📖 ${esc(j.title)} <small>by ${esc(j.author||'')}</small> <button onclick="fav('${id}')" id="fb">${st.fav.has(id)?'❤️':'🤍'}</button>`;
   drawPage()}
  catch(e){$('#rt').textContent='Sorry, this book could not be opened right now.'}}
-function drawPage(){const c=st.cur,n=Math.ceil(c.all.length/PAGE)||1;c.txt=c.all.slice(c.page*PAGE,c.page*PAGE+PAGE);
- $('#rb').innerHTML=paras(c.txt);$('#pager').classList.remove('hide');$('#pgno').textContent=`Page ${c.page+1} of ${n}`;
- st.meta[c.id].page=c.page;save();hist.length=0}
-function gotoPage(d){const c=st.cur,n=Math.ceil(c.all.length/PAGE)||1;stopRead();c.page=Math.max(0,Math.min(n-1,c.page+d));drawPage();window.scrollTo(0,0)}
+// Continuous scrolling: paragraphs render in chunks as the reader nears the bottom; c.page is the first visible paragraph.
+const CHUNK=40;let moreIO=null,scrT=0;
+function loadMore(){const c=st.cur;if(!c||!c.all||c.shown>=c.all.length)return false;const to=Math.min(c.all.length,c.shown+CHUNK);
+ $('#rb').insertAdjacentHTML('beforeend',paras(c.all.slice(c.shown,to),c.shown));c.shown=to;return true}
+function firstVisible(){const c=st.cur;for(let i=0;i<c.shown;i++){const p=document.getElementById('p'+i);if(p&&p.getBoundingClientRect().bottom>80)return i}return c.page}
+function updateProgress(){const c=st.cur;if(!c||!c.all||$('#v-reader').classList.contains('hide'))return;
+ c.page=firstVisible();c.txt=c.all.slice(c.page,c.page+PAGE);
+ $('#pgno').textContent=Math.round((c.page+1)/c.all.length*100)+'% read';
+ st.meta[c.id].page=c.page;save()}
+function drawPage(){const c=st.cur;c.shown=0;$('#rb').innerHTML='';
+ do loadMore();while(c.shown<c.page+CHUNK&&c.shown<c.all.length);
+ $('#pager').classList.remove('hide');hist.length=0;
+ if(moreIO)moreIO.disconnect();
+ let s=document.getElementById('more');if(!s){s=document.createElement('div');s.id='more';s.style.height='1px';$('#rb').after(s)}
+ moreIO=new IntersectionObserver(es=>{if(es[0].isIntersecting)loadMore()},{rootMargin:'1200px'});moreIO.observe(s);
+ const p=document.getElementById('p'+c.page);window.scrollTo(0,0);if(p&&c.page>0)p.scrollIntoView();
+ updateProgress()}
+addEventListener('scroll',()=>{clearTimeout(scrT);scrT=setTimeout(updateProgress,400)},{passive:true});
 function fav(id){st.fav.has(id)?st.fav.delete(id):st.fav.add(id);save();$('#fb').textContent=st.fav.has(id)?'❤️':'🤍'}
 function say(t,onend){if(!('speechSynthesis' in window)){if(onend)setTimeout(onend,1200);return}speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='en-GB';u.rate=.85;if(onend)u.onend=onend;speechSynthesis.speak(u)}
 let reading=0;
-function readAloud(){const ps=st.cur.txt,tok=++reading;let i=0;const next=()=>{if(tok!==reading)return;document.querySelectorAll('.reader p').forEach(p=>p.classList.remove('hl'));if(i>=ps.length)return;$('#p'+i).classList.add('hl');say(ps[i],()=>{i++;next()})};next()}
+function readAloud(){const c=st.cur,ps=c.all||c.txt,tok=++reading;let i=c.all?firstVisible():0;const next=()=>{if(tok!==reading)return;document.querySelectorAll('.reader p').forEach(p=>p.classList.remove('hl'));if(i>=ps.length)return;if(c.all&&i>=c.shown-3)loadMore();const el=$('#p'+i);el.classList.add('hl');if(c.all)el.scrollIntoView({block:'center',behavior:'smooth'});say(ps[i],()=>{i++;next()})};next()}
 function stopRead(){reading++;if('speechSynthesis' in window)speechSynthesis.cancel();document.querySelectorAll('.reader p').forEach(p=>p.classList.remove('hl'))}
 function wd(el){const w=el.textContent.replace(/[^\w']/g,'').toLowerCase();stopRead();say(w);if(w)askWord(w)}
 function startQuiz(){stopRead();const qs=st.cur.q;let i=0,sc=0;const box=$('#quiz');
