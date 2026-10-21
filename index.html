@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Digital E-Library – Client Demo</title>
+<title>Digital E-Library</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0a7d4f">
 <link rel="icon" href="icons/icon-192.png">
@@ -73,7 +73,7 @@ td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
 </style>
 </head>
 <body>
-<div class="banner">DEMO PROTOTYPE – sample content and live Azure OpenAI Buddy for client preview. Not the production application.</div>
+<div class="banner">Free books from Project Gutenberg and Open Library · AI Buddy powered by Azure OpenAI</div>
 
 <header id="hdr" class="hide">
   <h1>📚 Digital E-Library <small id="who"></small></h1>
@@ -94,18 +94,17 @@ td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
 <main>
 <section id="v-login" class="card login">
   <h1>📚 Welcome!</h1>
-  <p>Enter your library PIN.<br><small>(Demo: any 4 digits)</small></p>
+  <p>Enter your 4-digit library code.<br><small>Your librarian gives you this code.</small></p>
   <div class="dots" id="dots">····</div>
   <div class="pad" id="pad"></div>
-  <div class="sp" style="justify-content:center">
-    <button onclick="login('Ama')">📷 Scan library card (QR)</button>
-  </div>
-  <p><small>No email needed. Tablets are locked to the E-Library app (kiosk mode).</small></p>
+  <p id="lerr" style="color:var(--r);min-height:1.4em"></p>
+  <p><small>No email needed.</small></p>
 </section>
 
 <section id="v-home" class="hide">
   <div class="card">
-    <input type="search" id="q" placeholder="🔍 Search books, videos, lessons…">
+    <input type="search" id="q" placeholder="🔍 Search books, authors, stories…">
+    <div class="chips" id="shelves"></div>
     <div class="chips" id="ages"></div>
     <div class="chips" id="types"></div>
   </div>
@@ -120,10 +119,13 @@ td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
     <div class="sp">
       <button onclick="readAloud()">🔊 Read aloud</button>
       <button onclick="stopRead()">⏹ Stop</button>
-      <select id="lang"><option>English</option><option>Twi (production)</option><option>Ewe (production)</option><option>Ga (production)</option></select>
-      <button onclick="startQuiz()">📝 Quiz me</button>
+      <button id="quizbtn" onclick="startQuiz()">📝 Quiz me</button>
+      <button id="askbtn" class="hide" onclick="show('buddy')">🦉 Ask Kofi about this book</button>
     </div>
     <div id="rb"></div>
+    <div class="sp hide" id="pager" style="justify-content:space-between;margin:12px 0">
+      <button onclick="gotoPage(-1)">← Previous</button><b id="pgno"></b><button onclick="gotoPage(1)">Next →</button>
+    </div>
     <small>Tip: tap any word to hear it and see what it means.</small>
     <div id="wordbox" style="margin-top:10px"></div>
     <div id="quiz"></div>
@@ -169,24 +171,22 @@ td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
 
 <section id="v-staff" class="hide">
   <div class="card" id="staffgate">
-    <h2>Staff dashboard</h2>
-    <p>Librarian PIN required (demo PIN: <b>0000</b>)</p>
-    <input type="text" id="spin" placeholder="PIN" style="max-width:200px">
+    <h2>Administrator</h2>
+    <p>Enter the administrator passcode to manage learner codes.</p>
+    <input type="password" id="spin" placeholder="Passcode" style="max-width:260px">
     <button onclick="staffIn()">Open</button>
+    <p id="aerr" style="color:var(--r)"></p>
   </div>
   <div id="staffbody" class="hide">
-    <div class="kpis card">
-      <div class="kpi"><b>18 / 24</b>Tablets in use</div>
-      <div class="kpi"><b>312</b>Items read this month</div>
-      <div class="kpi"><b>47 min</b>Avg session</div>
-      <div class="kpi" style="background:var(--r)"><b id="k2">2</b>Safety alerts</div>
+    <div class="kpis card" id="akpi"></div>
+    <div class="card">
+      <h3>➕ Create a learner code</h3>
+      <div class="sp"><input type="text" id="nname" placeholder="Learner's name" maxlength="40" style="max-width:300px"><button onclick="mkCode()">Generate 4-digit code</button></div>
+      <p id="newcode"></p>
     </div>
-    <div class="card"><h3>Reading sessions this week</h3>
-      <div class="bars" id="bars"></div><div style="height:26px"></div></div>
-    <div class="card"><h3>Popular content</h3><table id="pop"></table></div>
+    <div class="card"><h3>Learner codes</h3><div style="overflow:auto"><table id="codes"></table></div></div>
     <div class="card"><h3>🚩 Flagged AI conversations (review queue)</h3><table id="alerts"></table></div>
-    <div class="card"><h3>Tablet fleet</h3><table id="fleet"></table></div>
-    <div class="card"><h3>Content licence register (sample)</h3><table id="lic"></table></div>
+    <div class="sp"><button onclick="staffOut()">Lock administrator</button></div>
   </div>
 </section>
 </main>
@@ -249,8 +249,20 @@ q:[["Green in kente stands for…",["Growth","War","Rain"],0]]}
 ];
 const AGES=['All','3–6','6–12','12–15','16–19'],TYPES=['All','Book','Lesson','Video','Audio'];
 const DEF={cedis:'Ghana money',wisdom:'knowing what is right and wise',struggled:'tried hard but found it difficult',finish:'the end of a race',shepherd:'a person who looks after sheep',magma:'hot melted rock under the ground',kente:'colourful woven cloth from Ghana',gather:'to come together',gathered:'came together',clay:'soft earth used to make pots',reaction:'when things change into something new',ananse:'the clever spider in Akan stories',pods:'the cases that hold seeds',hunters:'people who catch animals',net:'a mesh made of ropes',royalty:'kings and queens'};
-const st={age:'All',type:'All',q:'',cur:null,pin:'',user:null,read:{},fav:new Set(),badges:new Set(),stars:0};
-const alerts=[['09:14','Child #A113','Asked about violent content: blocked','Reviewed'],['10:02','Child #B207','Shared a phone number: blocked','New']];
+const st={age:'All',type:'All',q:'',cur:null,pin:'',user:null,code:null,read:{},fav:new Set(),badges:new Set(),stars:0,meta:{},shelf:'Starter Stories'};
+const BASE='https://funcflex-elibrary-47854.azurewebsites.net/api';
+const SHELVES=['Starter Stories','Fables & Folktales','Animals & Nature','Adventure & Fantasy','Family & Growing Up','Open Library'];
+const PAGE=6;
+let token=null;
+
+async function api(path,opts={}){
+ const r=await fetch(BASE+path,{...opts,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(opts.headers||{})},signal:AbortSignal.timeout(30000)});
+ if(r.status===401&&token&&!opts.admin){logout('Please sign in again.')}
+ const j=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(j.error||j.reply||'Request failed'),{status:r.status});return j}
+function pkey(){return 'elib-'+st.code}
+function save(){if(!st.code)return;try{localStorage.setItem(pkey(),JSON.stringify({read:st.read,fav:[...st.fav],badges:[...st.badges],stars:st.stars,meta:st.meta}))}catch(e){}}
+function restore(){try{const d=JSON.parse(localStorage.getItem(pkey())||'{}');st.read=d.read||{};st.fav=new Set(d.fav||[]);st.badges=new Set(d.badges||[]);st.stars=d.stars||0;st.meta=d.meta||{}}catch(e){}}
+function track(read){if(token)api('/lib/track',{method:'POST',body:JSON.stringify({read:!!read,stars:st.stars})}).catch(()=>{})}
 
 function show(v){document.querySelectorAll('main>section').forEach(s=>s.classList.add('hide'));$('#v-'+v).classList.remove('hide');
  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
@@ -260,25 +272,61 @@ function toggle(c){document.body.classList.toggle(c)}
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{stopRead();show(b.dataset.v)});
 
 function drawPad(){const p=$('#pad');p.innerHTML='';[1,2,3,4,5,6,7,8,9,'C',0,'✔'].forEach(k=>{const b=document.createElement('button');b.textContent=k;b.onclick=()=>key(k);p.appendChild(b)})}
-function key(k){if(k==='C')st.pin='';else if(k==='✔'){if(st.pin.length===4)login('Kwesi')}else if(st.pin.length<4){st.pin+=k;if(st.pin.length===4){$('#dots').textContent='●●●●';setTimeout(()=>login('Kwesi'),250);return}}
+function key(k){if(k==='C')st.pin='';else if(k==='✔'){if(st.pin.length===4)doLogin()}else if(st.pin.length<4){st.pin+=k;if(st.pin.length===4){$('#dots').textContent='●●●●';setTimeout(doLogin,200);return}}
  $('#dots').textContent=(st.pin.replace(/./g,'●')+'····').slice(0,4)}
-function login(n){st.user=n;st.pin='';$('#dots').textContent='····';$('#who').textContent='– Hi, '+n+'! 👋';$('#hdr').classList.remove('hide');startTimer();show('home')}
-function logout(){stopRead();hist.length=0;st.user=null;$('#hdr').classList.add('hide');$('#chat').innerHTML='';clearInterval(tm);show('login')}
+async function doLogin(){const code=st.pin;st.pin='';$('#lerr').textContent='';
+ try{const j=await api('/lib/login',{method:'POST',body:JSON.stringify({code})});token=j.token;st.code=code;localStorage.setItem('elib-session',JSON.stringify({token,name:j.name,code}));enter(j.name)}
+ catch(e){$('#dots').textContent='····';$('#lerr').textContent=e.status===undefined?'Cannot reach the library. Check your internet.':e.message}}
+function enter(n){restore();st.user=n;$('#dots').textContent='····';$('#who').textContent='– Hi, '+n+'! 👋';$('#hdr').classList.remove('hide');startTimer();show('home')}
+function logout(msg){stopRead();hist.length=0;st.user=null;st.code=null;token=null;st.cur=null;localStorage.removeItem('elib-session');$('#hdr').classList.add('hide');$('#chat').innerHTML='';clearInterval(tm);show('login');$('#lerr').textContent=typeof msg==='string'?msg:''}
+function resume(){try{const s=JSON.parse(localStorage.getItem('elib-session')||'null');if(!s)return;const p=JSON.parse(atob(s.token.split('.')[0].replace(/-/g,'+').replace(/_/g,'/')));if(p.exp<Date.now())return localStorage.removeItem('elib-session');token=s.token;st.code=s.code;enter(s.name)}catch(e){}}
 let tm,secs=900;function startTimer(){secs=900;clearInterval(tm);tm=setInterval(()=>{secs--;const t=$('#timer');if(t)t.textContent=Math.floor(secs/60)+':'+String(secs%60).padStart(2,'0');if(secs<=0){clearInterval(tm);alert('Time for a reading break! 📖')}},1000)}
 
 function chips(el,arr,key){el.innerHTML='';arr.forEach(a=>{const c=document.createElement('span');c.className='chip'+(st[key]===a?' on':'');c.textContent=a;c.onclick=()=>{st[key]=a;renderHome()};el.appendChild(c)})}
-function renderHome(){chips($('#ages'),AGES,'age');chips($('#types'),TYPES,'type');
- const ks=Object.keys(st.read),last=ks[ks.length-1];
- $('#cont').innerHTML=last?`<b>▶ Continue reading:</b> ${LIB.find(x=>x.id==last).t} <button onclick="openBook(${last})">Continue</button>`:'<b>👋 Pick a story to start your first reading mission!</b>';
- const q=st.q.toLowerCase();const items=LIB.filter(i=>(st.age==='All'||i.age===st.age)&&(st.type==='All'||i.type===st.type)&&i.t.toLowerCase().includes(q));
- $('#grid').innerHTML=items.map(i=>`<div class="tile" onclick="openBook(${i.id})"><div class="cover" style="background:${COV[i.id%6]}">${i.e}</div><div class="t">${st.fav.has(i.id)?'❤️ ':''}${i.t}<small>${i.type} · Ages ${i.age}<br>${i.src}</small></div></div>`).join('')||'<p>No items found.</p>';}
-$('#q').oninput=e=>{st.q=e.target.value;renderHome()};
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let homeTok=0;
+function tileHtml(b){const rid='g'+b.id;return `<div class="tile" onclick="openRemote(${b.id})"><div class="cover" style="background:${COV[b.id%6]}"><img src="${esc(b.cover)}" alt="" loading="lazy" style="max-height:130px;max-width:100%" onerror="this.replaceWith('📖')"></div><div class="t">${st.fav.has(rid)?'❤️ ':''}${esc(b.title)}<small>${esc(b.author)}</small></div></div>`}
+function recent(){const ks=Object.keys(st.read),last=ks[ks.length-1];if(!last)return '<b>👋 Pick a story to start your first reading mission!</b>';
+ const m=last.startsWith('g')?st.meta[last]:LIB.find(x=>x.id==last);if(!m)return '<b>👋 Pick a story to start!</b>';
+ return `<b>▶ Continue reading:</b> ${esc(m.t)} <button onclick="${last.startsWith('g')?`openRemote(${last.slice(1)})`:`openBook(${last})`}">Continue</button>`}
+async function renderHome(){const tok=++homeTok;chips($('#shelves'),SHELVES,'shelf');
+ const local=st.shelf==='Starter Stories'||st.q.trim();
+ $('#ages').classList.toggle('hide',st.shelf!=='Starter Stories');$('#types').classList.toggle('hide',st.shelf!=='Starter Stories');
+ if(st.shelf==='Starter Stories'){chips($('#ages'),AGES,'age');chips($('#types'),TYPES,'type')}
+ $('#cont').innerHTML=recent();
+ const q=st.q.trim().toLowerCase();
+ const loc=LIB.filter(i=>(st.shelf!=='Starter Stories'&&!q?false:true)&&(st.shelf!=='Starter Stories'||((st.age==='All'||i.age===st.age)&&(st.type==='All'||i.type===st.type)))&&i.t.toLowerCase().includes(q));
+ const locHtml=loc.map(i=>`<div class="tile" onclick="openBook(${i.id})"><div class="cover" style="background:${COV[i.id%6]}">${i.e}</div><div class="t">${st.fav.has(i.id)?'❤️ ':''}${i.t}<small>${i.type} · Ages ${i.age}<br>${i.src}</small></div></div>`).join('');
+ const g=$('#grid');
+ if(st.shelf==='Starter Stories'&&!q){g.innerHTML=locHtml||'<p>No items found.</p>';return}
+ g.innerHTML=locHtml+'<p>⏳ Loading books…</p>';
+ try{let h='';
+  if(st.shelf==='Open Library'){const j=await api('/lib/discover?q='+encodeURIComponent(q));if(tok!==homeTok)return;
+   h=j.books.map(b=>`<a class="tile" href="${esc(b.url)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><div class="cover" style="background:#e8f0ff">${b.cover?`<img src="${esc(b.cover)}" alt="" loading="lazy" style="max-height:130px;max-width:100%" onerror="this.replaceWith('📘')">`:'📘'}</div><div class="t">${esc(b.title)}<small>${esc(b.author)}${b.year?' · '+b.year:''}<br>Opens on Open Library ↗</small></div></a>`).join('')}
+  else{const j=await api('/lib/catalog?'+(q?'q='+encodeURIComponent(q):'shelf='+encodeURIComponent(st.shelf)));if(tok!==homeTok)return;j.books.forEach(b=>st.meta['g'+b.id]=st.meta['g'+b.id]||{t:b.title,id:b.id});h=j.books.map(tileHtml).join('')}
+  g.innerHTML=locHtml+h||'<p>No items found.</p>'}
+ catch(e){if(tok===homeTok)g.innerHTML=locHtml+'<p>Could not load books right now. Please try again.</p>'}}
+let sTimer;$('#q').oninput=e=>{st.q=e.target.value;clearTimeout(sTimer);sTimer=setTimeout(renderHome,st.q.trim()?450:0)};
 
-function openBook(id){const b=LIB.find(x=>x.id==id);st.cur=b;st.read[id]=1;show('reader');
+function openBook(id){const b=LIB.find(x=>x.id==id);st.cur=b;st.read[id]=1;save();track(true);show('reader');
+ $('#pager').classList.add('hide');$('#quizbtn').classList.remove('hide');$('#askbtn').classList.add('hide');
  $('#rt').innerHTML=b.e+' '+b.t+` <button onclick="fav(${id})" id="fb">${st.fav.has(id)?'❤️':'🤍'}</button>`;
- $('#rb').innerHTML=b.txt.map((p,i)=>`<p id="p${i}">`+p.split(' ').map(w=>`<span class="word" onclick="wd(this)">${w}</span>`).join(' ')+'</p>').join('');
+ $('#rb').innerHTML=paras(b.txt);
  $('#quiz').innerHTML='';$('#wordbox').textContent='';window.scrollTo(0,0)}
-function fav(id){st.fav.has(id)?st.fav.delete(id):st.fav.add(id);$('#fb').textContent=st.fav.has(id)?'❤️':'🤍'}
+function paras(ps){return ps.map((p,i)=>`<p id="p${i}">`+esc(p).split(' ').map(w=>`<span class="word" onclick="wd(this)">${w}</span>`).join(' ')+'</p>').join('')}
+async function openRemote(n){const id='g'+n;show('reader');stopRead();$('#rt').textContent='⏳ Opening book…';$('#rb').innerHTML='';$('#pager').classList.add('hide');$('#quiz').innerHTML='';$('#wordbox').textContent='';
+ try{const j=await api('/lib/text?id='+n);
+  st.cur={id,t:j.title,e:'📖',age:'6-12',remote:true,all:j.paragraphs,page:Math.min((st.meta[id]&&st.meta[id].page)||0,Math.max(0,Math.ceil(j.paragraphs.length/PAGE)-1)),txt:[]};
+  st.meta[id]={t:j.title,id:n,page:st.cur.page};st.read[id]=1;save();track(true);
+  $('#quizbtn').classList.add('hide');$('#askbtn').classList.remove('hide');
+  $('#rt').innerHTML=`📖 ${esc(j.title)} <small>by ${esc(j.author||'')}</small> <button onclick="fav('${id}')" id="fb">${st.fav.has(id)?'❤️':'🤍'}</button>`;
+  drawPage()}
+ catch(e){$('#rt').textContent='Sorry, this book could not be opened right now.'}}
+function drawPage(){const c=st.cur,n=Math.ceil(c.all.length/PAGE)||1;c.txt=c.all.slice(c.page*PAGE,c.page*PAGE+PAGE);
+ $('#rb').innerHTML=paras(c.txt);$('#pager').classList.remove('hide');$('#pgno').textContent=`Page ${c.page+1} of ${n}`;
+ st.meta[c.id].page=c.page;save();hist.length=0}
+function gotoPage(d){const c=st.cur,n=Math.ceil(c.all.length/PAGE)||1;stopRead();c.page=Math.max(0,Math.min(n-1,c.page+d));drawPage();window.scrollTo(0,0)}
+function fav(id){st.fav.has(id)?st.fav.delete(id):st.fav.add(id);save();$('#fb').textContent=st.fav.has(id)?'❤️':'🤍'}
 function say(t,onend){if(!('speechSynthesis' in window)){if(onend)setTimeout(onend,1200);return}speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='en-GB';u.rate=.85;if(onend)u.onend=onend;speechSynthesis.speak(u)}
 let reading=0;
 function readAloud(){const ps=st.cur.txt,tok=++reading;let i=0;const next=()=>{if(tok!==reading)return;document.querySelectorAll('.reader p').forEach(p=>p.classList.remove('hl'));if(i>=ps.length)return;$('#p'+i).classList.add('hl');say(ps[i],()=>{i++;next()})};next()}
@@ -288,7 +336,7 @@ function startQuiz(){stopRead();const qs=st.cur.q;let i=0,sc=0;const box=$('#qui
  window.ans=(j,a)=>{if(j===a){sc++;say('Well done!')}else say('Nice try!');i++;go()};
  const go=()=>{if(i>=qs.length){box.innerHTML=`<div class="card"><h3>🎉 You got ${sc}/${qs.length}!</h3></div>`;st.stars+=sc;badge('Finished: '+st.cur.t);if(sc===qs.length)badge('Quiz Star ⭐');return}
   const [q,o,a]=qs[i];box.innerHTML=`<div class="card"><h3>${q}</h3>`+o.map((x,j)=>`<button style="margin:4px" onclick="ans(${j},${a})">${x}</button>`).join('')+'</div>'};go()}
-function badge(n){st.badges.add(n)}
+function badge(n){st.badges.add(n);save();track(false)}
 
 const KB=[[/ananse|spider/,"Ananse is the clever spider in Akan stories. In our library story he learns that wisdom belongs to everybody! 🕷️"],
 [/wisdom/,"Wisdom means knowing what is right and using what you learn well. Ananse tried to keep it all for himself!"],
@@ -299,22 +347,20 @@ const KB=[[/ananse|spider/,"Ananse is the clever spider in Akan stories. In our 
 [/kente/,"Kente cloth comes from Ghana. Gold means wealth, green means growth, blue means peace."]];
 const BAD=/\b(guns?|pistols?|bombs?|weapons?|kill\w*|sex\w*|drugs?|hate|murder|suicide|porn\w*)\b|address|phone number|meet me/;
 function bot(t,c){const d=document.createElement('div');d.className='msg bot '+(c||'');d.textContent=t;$('#chat').appendChild(d);$('#chat').scrollTop=1e5}
-const API='https://funcflex-elibrary-47854.azurewebsites.net/api/buddy';
 const hist=[];
-function flagAlert(t){alerts.unshift([new Date().toLocaleTimeString().slice(0,5),st.user||'Child','Flagged topic: "'+t.slice(0,40)+'"','New'])}
-function offline(t){const l=t.toLowerCase();if(BAD.test(l)){flagAlert(t);return["That's not something I can talk about. I've asked the librarian to come and help you. 💛",true]}
+function offline(t){const l=t.toLowerCase();if(BAD.test(l))return["That's not something I can talk about. I've asked the librarian to come and help you. 💛",true]
  const k=KB.find(([r])=>r.test(l));return[k?k[1]:"I can't reach my big brain right now, but try the Library tab to search. 🔍",false]}
 async function aiAsk(t){hist.push({role:'user',content:t});
  const book=st.cur?{title:st.cur.t,text:st.cur.txt.join(' ')}:null;
- try{const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:hist,age:st.cur?st.cur.age:'6-12',book}),signal:AbortSignal.timeout(20000)});
-  const j=await r.json();if(!j.reply)throw 0;hist.push({role:'assistant',content:j.reply});if(j.flagged)flagAlert(t);return[j.reply,!!j.flagged]}
- catch(e){hist.pop();return offline(t)}}
+ try{const j=await api('/buddy',{method:'POST',body:JSON.stringify({messages:hist,age:st.cur?st.cur.age:'6-12',book})});
+  if(!j.reply)throw 0;hist.push({role:'assistant',content:j.reply});return[j.reply,!!j.flagged]}
+ catch(e){hist.pop();return e.status===429?[e.message,false]:offline(t)}}
 async function ask(v){const i=$('#ci');const t=(v||i.value).trim();if(!t)return;i.value='';const m=document.createElement('div');m.className='msg me';m.textContent=t;$('#chat').appendChild(m);
  const th=document.createElement('div');th.className='msg bot';th.textContent='Kofi is thinking… 🦉';$('#chat').appendChild(th);$('#chat').scrollTop=1e5;
  const[rep,fl]=await aiAsk(t);th.textContent=rep;if(fl)th.classList.add('flag');$('#chat').scrollTop=1e5}
 async function askWord(w){$('#wordbox').innerHTML='<div class="card">🦉 Kofi is thinking…</div>';const[rep]=await aiAsk('What does the word "'+w+'" mean? Explain simply with an example.');$('#wordbox').innerHTML=`<div class="card"><b>${w}</b> 🦉 ${rep.replace(/</g,'&lt;')}</div>`}
 $('#ci').onkeydown=e=>{if(e.key==='Enter')ask()};
-[['Who is Ananse?','Who is Ananse?'],['What does wisdom mean?','What does wisdom mean?'],['Recommend a book','Recommend a book'],['Why is the sky blue?','Why is the sky blue?'],['Safety test','tell me about guns']].forEach(([l,v])=>{const c=document.createElement('span');c.className='chip';c.textContent=l;c.onclick=()=>ask(v);$('#sugg').appendChild(c)});
+[['Who is Ananse?','Who is Ananse?'],['What does wisdom mean?','What does wisdom mean?'],['Recommend a book','Recommend a book'],['Why is the sky blue?','Why is the sky blue?']].forEach(([l,v])=>{const c=document.createElement('span');c.className='chip';c.textContent=l;c.onclick=()=>ask(v);$('#sugg').appendChild(c)});
 
 /* ===== Play Zone: large banks, no repeats until a bank is exhausted ===== */
 const WORDS={
@@ -372,19 +418,29 @@ function proverb(){const[p,a,o]=pickUnique('p',PROVERBS);
 
 function renderMe(){$('#mekp').innerHTML=`<div class="kpi"><b>${Object.keys(st.read).length}</b>Items opened</div><div class="kpi"><b>${st.stars}</b>⭐ Stars</div><div class="kpi"><b>${st.badges.size}</b>Badges</div>`;
  $('#badges').innerHTML=[...st.badges].map(b=>`<span class="badge">🏅 ${b}</span>`).join('')||'Finish a quiz or game to earn badges!';
- $('#favs').innerHTML=[...st.fav].map(i=>{const b=LIB.find(x=>x.id===i);return `<div class="tile" onclick="openBook(${i})"><div class="cover" style="background:${COV[i%6]}">${b.e}</div><div class="t">${b.t}</div></div>`}).join('')||'<p>Tap 🤍 inside a book to save favourites.</p>'}
+ $('#favs').innerHTML=[...st.fav].map(i=>{if(String(i).startsWith('g')){const m=st.meta[i];return m?`<div class="tile" onclick="openRemote(${m.id})"><div class="cover" style="background:${COV[m.id%6]}">📖</div><div class="t">${esc(m.t)}</div></div>`:''}const b=LIB.find(x=>x.id===i);return b?`<div class="tile" onclick="openBook(${i})"><div class="cover" style="background:${COV[i%6]}">${b.e}</div><div class="t">${b.t}</div></div>`:''}).join('')||'<p>Tap 🤍 inside a book to save favourites.</p>'}
 
-function staffIn(){if($('#spin').value==='0000'){$('#staffgate').classList.add('hide');$('#staffbody').classList.remove('hide');renderStaff()}else alert('Wrong PIN')}
-function renderStaff(){if($('#staffbody').classList.contains('hide'))return;
- const d=[['Mon',38],['Tue',52],['Wed',47],['Thu',61],['Fri',70],['Sat',33]];
- $('#bars').innerHTML=d.map(([n,v])=>`<div style="height:${v/70*100}%"><span>${n} (${v})</span></div>`).join('');
- $('#pop').innerHTML='<tr><th>Title</th><th>Reads</th><th>Avg quiz score</th></tr>'+LIB.slice(0,5).map((b,i)=>`<tr><td>${b.e} ${b.t}</td><td>${88-i*13+(st.read[b.id]?1:0)}</td><td>${90-i*4}%</td></tr>`).join('');
- $('#alerts').innerHTML='<tr><th>Time</th><th>Child</th><th>Reason</th><th>Status</th></tr>'+alerts.map(a=>`<tr><td>${a[0]}</td><td>${a[1]}</td><td>${a[2]}</td><td>${a[3]}</td></tr>`).join('');
- $('#k2').textContent=alerts.length;
- $('#fleet').innerHTML='<tr><th>Tablet</th><th>Status</th><th>Battery</th><th>Mode</th></tr>'+Array.from({length:6},(_,i)=>`<tr><td>TAB-${String(i+1).padStart(2,'0')}</td><td>${i<4?'In use':'Charging'}</td><td>${[88,64,41,95,100,72][i]}%</td><td>Kiosk locked 🔒</td></tr>`).join('');
- $('#lic').innerHTML='<tr><th>Item</th><th>Licence</th><th>Reviewed</th></tr>'+LIB.slice(0,5).map(b=>`<tr><td>${b.t}</td><td>${/Public/.test(b.src)?'Public domain':/Original/.test(b.src)?'Commissioned':'CC BY-SA'}</td><td>✔ Age-checked</td></tr>`).join('')}
+let adminPass='';
+async function admin(body){return api('/lib/admin',{method:'POST',admin:true,headers:{'x-admin-pass':adminPass},body:JSON.stringify(body)})}
+async function staffIn(){adminPass=$('#spin').value;$('#aerr').textContent='';
+ try{await admin({op:'list'});$('#staffgate').classList.add('hide');$('#staffbody').classList.remove('hide');renderStaff()}
+ catch(e){adminPass='';$('#aerr').textContent=e.status===401?'Wrong passcode':e.message}}
+function staffOut(){adminPass='';$('#spin').value='';$('#staffbody').classList.add('hide');$('#staffgate').classList.remove('hide')}
+async function mkCode(){const name=$('#nname').value.trim();if(!name)return;
+ try{const j=await admin({op:'create',name});$('#nname').value='';$('#newcode').innerHTML=`New code for <b>${esc(j.name)}</b>: <b style="font-size:1.8em;letter-spacing:6px">${j.code}</b> — give it to the learner.`;renderStaff()}catch(e){$('#newcode').textContent=e.message}}
+async function codeOp(op,code){if(op==='delete'&&!confirm('Delete code '+code+'?'))return;await admin({op,code});renderStaff()}
+async function reviewAlert(id){await admin({op:'review',id});renderStaff()}
+async function renderStaff(){if($('#staffbody').classList.contains('hide'))return;
+ try{const j=await admin({op:'list'});
+  const act=j.codes.filter(c=>c.active).length,newA=j.alerts.filter(a=>!a.reviewed).length;
+  $('#akpi').innerHTML=`<div class="kpi"><b>${act}</b>Active codes</div><div class="kpi"><b>${j.codes.reduce((s,c)=>s+c.reads,0)}</b>Books opened</div><div class="kpi"><b>${j.codes.reduce((s,c)=>s+c.sessions,0)}</b>Sign-ins</div><div class="kpi" style="background:var(--r)"><b>${newA}</b>Safety alerts</div>`;
+  const d=s=>s?new Date(s).toLocaleString([], {dateStyle:'short',timeStyle:'short'}):'—';
+  $('#codes').innerHTML='<tr><th>Code</th><th>Learner</th><th>Status</th><th>Last seen</th><th>Sign-ins</th><th>Books</th><th>⭐</th><th></th></tr>'+(j.codes.map(c=>`<tr><td><b>${c.code}</b></td><td>${esc(c.name)}</td><td>${c.active?'✅ Active':'⛔ Revoked'}</td><td>${d(c.lastSeen)}</td><td>${c.sessions}</td><td>${c.reads}</td><td>${c.stars}</td><td>${c.active?`<button onclick="codeOp('revoke','${c.code}')">Revoke</button>`:`<button onclick="codeOp('restore','${c.code}')">Restore</button>`} <button style="background:#eee" onclick="codeOp('delete','${c.code}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="8">No codes yet. Create one above.</td></tr>');
+  $('#alerts').innerHTML='<tr><th>Time</th><th>Learner</th><th>Question</th><th>Status</th></tr>'+(j.alerts.map(a=>`<tr><td>${d(a.time)}</td><td>${esc(a.name)}</td><td>${esc(a.text)}</td><td>${a.reviewed?'Reviewed':`<button onclick="reviewAlert('${a.id}')">Mark reviewed</button>`}</td></tr>`).join('')||'<tr><td colspan="4">No flagged conversations.</td></tr>')}
+ catch(e){if(e.status===401)staffOut()}}
 
 drawPad();
+resume();
 
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 let dip=null;
