@@ -98,7 +98,7 @@ td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
   <div class="dots" id="dots">····</div>
   <div class="pad" id="pad"></div>
   <p id="lerr" style="color:var(--r);min-height:1.4em"></p>
-  <p><small>No email needed.</small></p>
+  <p><small>No email needed. <a href="#" onclick="show('staff');return false">Administrator</a></small></p>
 </section>
 
 <section id="v-home" class="hide">
@@ -174,7 +174,7 @@ td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
     <h2>Administrator</h2>
     <p>Enter the administrator passcode to manage learner codes.</p>
     <input type="password" id="spin" placeholder="Passcode" style="max-width:260px">
-    <button onclick="staffIn()">Open</button>
+    <button onclick="staffIn()">Open</button> <button style="background:#eee" onclick="show(st.user?'home':'login')">← Back</button>
     <p id="aerr" style="color:var(--r)"></p>
   </div>
   <div id="staffbody" class="hide">
@@ -186,7 +186,7 @@ td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
     </div>
     <div class="card"><h3>Learner codes</h3><div style="overflow:auto"><table id="codes"></table></div></div>
     <div class="card"><h3>🚩 Flagged AI conversations (review queue)</h3><table id="alerts"></table></div>
-    <div class="sp"><button onclick="staffOut()">Lock administrator</button></div>
+    <div class="sp">    <button onclick="staffOut()">Lock administrator</button> <button style="background:#eee" onclick="staffOut();show(st.user?'home':'login')">← Back</button></div>
   </div>
 </section>
 </main>
