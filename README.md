@@ -5,7 +5,7 @@ Child-friendly digital library (vanilla HTML/CSS/JS PWA). Learners sign in with 
 - **Books:** curated Project Gutenberg classics (full text, read-aloud, tap-a-word meanings, paged reader), Gutenberg search via Gutendex, and an Open Library discovery shelf. Starter stories and the Play Zone are built in.
 - **Access codes:** administrator tab (passcode) creates, revokes, restores and deletes codes and shows usage and flagged AI questions. Each code is created as **Kids** or **Adult** (older codes default to Kids); the code a person signs in with decides which library they get.
 - **Kids library:** colourful UI, starter stories, curated children's shelves, Play Zone, quizzes, badges, child-safe Kofi Reading Buddy with flagging.
-- **Adult library:** calmer theme, classic literature / mystery / philosophy / science shelves, unfiltered Gutenberg and Open Library search, "My Shelf", and an adult AI Library Assistant (no kids games, timer or flagging). Shelf selection and the AI persona are enforced server-side from the session token (`t` claim).
+- **Adult library:** calmer theme, classic literature / mystery / philosophy / science shelves plus SHS study shelves (Science, Mathematics, Geography & Agriculture, English Literature, Economics & Government) built from public-domain Gutenberg texts, unfiltered Gutenberg and Open Library search, "My Shelf", and an adult AI Library Assistant (no kids games, timer or flagging). Current Ghana SHS textbooks are copyrighted and are not hosted. Shelf selection and the AI persona are enforced server-side from the session token (`t` claim).
 - **Progress** (read list, favourites, badges, stars) is stored per code in the browser; usage counts sync to the server.
 
 ## Architecture
