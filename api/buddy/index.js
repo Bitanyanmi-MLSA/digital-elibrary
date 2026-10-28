@@ -11,6 +11,14 @@ Never: discuss violence, sex, drugs, weapons, self-harm, hate, politics or relig
 If the question is not about learning, reading or play, gently steer back to books and learning.
 ${book ? `The child is currently reading: "${String(book.title || "").slice(0, 100)}". Story text:\n${String(book.text || "").slice(0, 2500)}` : ""}`;
 
+const ADULT_SYSTEM = book => `You are Kofi, the AI Library Assistant in the adult section of a digital library in Ghana.
+You are an AI helper, not a person, and you say so if asked.
+Audience: adult readers. Be clear, respectful and concise. Use British English spelling.
+Do: explain words, themes, context and characters; summarise and discuss books and ideas (including mature themes found in literature) in an informative, non-graphic way; help with study, writing, research and reading recommendations; use Ghanaian examples where natural.
+Never: give explicit sexual content, instructions for violence, weapons, self-harm or illegal activity, or medical, legal or financial advice beyond general information. If a user seems in distress, kindly suggest speaking to a trusted person or professional.
+If the question is unrelated to reading, learning or research, gently steer back to books and learning.
+${book ? `The reader is currently reading: "${String(book.title || "").slice(0, 100)}". Text excerpt:\n${String(book.text || "").slice(0, 2500)}` : ""}`;
+
 // Deterministic pre-filter: blocked topics are refused even when asked as "what is X?" or "meaning of X".
 const BLOCKED = /\b(guns?|pistols?|rifles?|firearms?|bombs?|weapons?|knife|knives|stab|shoot(?:ing)?|kill(?:ing|ed|s)?|murder|suicide|self[- ]?harm|rape|sex(?:ual|y)?|porn\w*|nude|naked|drugs?|cocaine|heroin|weed|marijuana|alcohol|beer|vodka|terroris[mt]|hate|racis[mt]|abuse|blood|violen(?:ce|t))\b|phone number|home address|meet me/i;
 const SAFE_REPLY = "That's not something I can talk about. Please ask the librarian or a trusted grown-up. I've let the librarian know. 💛";
@@ -38,15 +46,16 @@ module.exports = async function (context, req) {
     .map(m => ({ role: m.role, content: m.content.slice(0, 500) }));
   if (!msgs.length || msgs[msgs.length - 1].role !== "user") return send(400, { error: "No question" });
 
+  const adult = session.t === "adult";
   const last = msgs[msgs.length - 1].content;
-  if (BLOCKED.test(last)) { await flag(last); return send(200, { flagged: true, reply: SAFE_REPLY }); }
+  if (!adult && BLOCKED.test(last)) { await flag(last); return send(200, { flagged: true, reply: SAFE_REPLY }); }
 
   try {
     const r = await fetch(`${ENDPOINT}openai/deployments/${DEPLOYMENT}/chat/completions?api-version=2024-10-21`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + await token() },
       body: JSON.stringify({
-        messages: [{ role: "system", content: SYSTEM(String(body.age || "").slice(0, 10), body.book) }, ...msgs],
+        messages: [{ role: "system", content: adult ? ADULT_SYSTEM(body.book) : SYSTEM(String(body.age || "").slice(0, 10), body.book) }, ...msgs],
         max_tokens: 350,
         temperature: 0.5
       })
@@ -54,6 +63,7 @@ module.exports = async function (context, req) {
     const j = await r.json();
     if (!r.ok) {
       if (j.error && j.error.code === "content_filter") {
+        if (adult) return send(200, { reply: "I can't help with that request. Please try rephrasing it. 📚" });
         await flag(last);
         return send(200, { flagged: true, reply: "That's not something I can talk about. I've asked the librarian to come and help you. 💛" });
               }
@@ -62,7 +72,7 @@ module.exports = async function (context, req) {
     }
     const choice = j.choices[0];
     let reply = (choice.message.content || "").trim();
-    const flagged = reply.startsWith("[FLAG]") || choice.finish_reason === "content_filter";
+    const flagged = !adult && (reply.startsWith("[FLAG]") || choice.finish_reason === "content_filter");
     reply = reply.replace("[FLAG]", "").trim() || "Let's talk to the librarian about that. 💛";
     if (flagged) await flag(last);
     return send(200, { reply, flagged });

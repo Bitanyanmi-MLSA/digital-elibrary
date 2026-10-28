@@ -10,6 +10,14 @@ const SHELVES = {
   "Adventure & Fantasy": [[11, "Alice's Adventures in Wonderland", "Lewis Carroll"], [12, "Through the Looking-Glass", "Lewis Carroll"], [16, "Peter Pan", "J. M. Barrie"], [55, "The Wonderful Wizard of Oz", "L. Frank Baum"], [500, "The Adventures of Pinocchio", "Carlo Collodi"], [778, "Five Children and It", "E. Nesbit"], [18857, "A Journey to the Centre of the Earth", "Jules Verne"]],
   "Family & Growing Up": [[113, "The Secret Garden", "Frances Hodgson Burnett"], [1448, "Heidi", "Johanna Spyri"], [45, "Anne of Green Gables", "L. M. Montgomery"], [514, "Little Women", "Louisa May Alcott"], [1874, "The Railway Children", "E. Nesbit"]]
 };
+// Adult shelves are only served to sessions whose code was created as "adult".
+const ADULT_SHELVES = {
+  "Classic Literature": [[1342, "Pride and Prejudice", "Jane Austen"], [1260, "Jane Eyre", "Charlotte Brontë"], [768, "Wuthering Heights", "Emily Brontë"], [98, "A Tale of Two Cities", "Charles Dickens"], [1400, "Great Expectations", "Charles Dickens"], [2701, "Moby-Dick", "Herman Melville"], [2554, "Crime and Punishment", "Fyodor Dostoevsky"], [64317, "The Great Gatsby", "F. Scott Fitzgerald"]],
+  "Mystery & Thrillers": [[1661, "The Adventures of Sherlock Holmes", "Arthur Conan Doyle"], [2852, "The Hound of the Baskervilles", "Arthur Conan Doyle"], [345, "Dracula", "Bram Stoker"], [84, "Frankenstein", "Mary Shelley"], [174, "The Picture of Dorian Gray", "Oscar Wilde"], [1184, "The Count of Monte Cristo", "Alexandre Dumas"]],
+  "Philosophy & Leadership": [[1232, "The Prince", "Niccolò Machiavelli"], [2680, "Meditations", "Marcus Aurelius"], [132, "The Art of War", "Sun Tzu"], [1497, "The Republic", "Plato"], [205, "Walden", "Henry David Thoreau"], [5827, "The Problems of Philosophy", "Bertrand Russell"]],
+  "Science & Society": [[1228, "On the Origin of Species", "Charles Darwin"], [3300, "The Wealth of Nations", "Adam Smith"], [35, "The Time Machine", "H. G. Wells"], [36, "The War of the Worlds", "H. G. Wells"], [4363, "Beyond Good and Evil", "Friedrich Nietzsche"]]
+};
+const shelvesFor = adult => adult ? ADULT_SHELVES : SHELVES;
 const coverOf = id => `https://www.gutenberg.org/cache/epub/${id}/pg${id}.cover.medium.jpg`;
 const shelfBook = (shelf, [id, title, author]) => ({ id, title, author, cover: coverOf(id), subjects: [shelf] });
 const SESSION_MS = 12 * 3600 * 1000;
@@ -18,6 +26,8 @@ const textCache = new Map();
 
 const safeText = (s, n) => String(s || "").slice(0, n);
 const codeOk = c => /^\d{4}$/.test(String(c));
+// Codes created before adult support have no type and stay kids codes.
+const typeOf = e => (e && e.type === "adult" ? "adult" : "kids");
 
 async function jget(url, ms) {
   const r = await fetch(url, { headers: { "User-Agent": "DigitalELibrary/1.0 (educational)" }, signal: AbortSignal.timeout(ms || 15000) });
@@ -36,13 +46,14 @@ function cleanBook(b) {
   };
 }
 
-async function catalog(q) {
+async function catalog(q, adult) {
+  const SH = shelvesFor(adult);
   const search = safeText(q.q, 80).trim().toLowerCase();
-  const all = Object.entries(SHELVES).flatMap(([s, bs]) => bs.map(b => shelfBook(s, b)));
+  const all = Object.entries(SH).flatMap(([s, bs]) => bs.map(b => shelfBook(s, b)));
   if (!search) {
-    const shelf = SHELVES[q.shelf] ? q.shelf : "";
-    const books = shelf ? SHELVES[shelf].map(b => shelfBook(shelf, b)) : all;
-    return { books, shelves: Object.keys(SHELVES) };
+    const shelf = SH[q.shelf] ? q.shelf : "";
+    const books = shelf ? SH[shelf].map(b => shelfBook(shelf, b)) : all;
+    return { books, shelves: Object.keys(SH) };
   }
   const local = all.filter(b => (b.title + " " + b.author).toLowerCase().includes(search));
   let more = [];
@@ -51,15 +62,15 @@ async function catalog(q) {
     more = (j.results || [])
       .filter(b => b.formats && Object.keys(b.formats).some(f => f.startsWith("text/plain")))
       .map(cleanBook)
-      .filter(b => !BLOCKED.test(b.title + " " + b.subjects.join(" ")) && !local.some(l => l.id === b.id));
+      .filter(b => (adult || !BLOCKED.test(b.title + " " + b.subjects.join(" "))) && !local.some(l => l.id === b.id));
   } catch (e) { /* Gutendex can be slow; curated matches still return */ }
-  return { books: [...local, ...more], shelves: Object.keys(SHELVES) };
+  return { books: [...local, ...more], shelves: Object.keys(SH) };
 }
 
 
-async function discover(q) {
+async function discover(q, adult) {
   const params = new URLSearchParams({
-    q: safeText(q.q, 80).trim() || "subject:juvenile_fiction",
+    q: safeText(q.q, 80).trim() || (adult ? "subject:fiction" : "subject:juvenile_fiction"),
     limit: "24",
     fields: "key,title,author_name,cover_i,first_publish_year,subject"
   });
@@ -71,7 +82,7 @@ async function discover(q) {
     cover: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : "",
     url: "https://openlibrary.org" + d.key,
     subjects: (d.subject || []).slice(0, 4).map(s => safeText(s, 40))
-  })).filter(b => !BLOCKED.test(b.title + " " + b.subjects.join(" ")));
+  })).filter(b => adult || !BLOCKED.test(b.title + " " + b.subjects.join(" ")));
   return { books };
 }
 
@@ -117,7 +128,8 @@ module.exports = async function (context, req) {
       if (!e || !e.active) return send(401, { error: "That code is not valid. Please check with your librarian." });
       const now = new Date().toISOString();
       await T.merge("codes", "code", code, { lastSeen: now, sessionStart: now, online: true, sessions: (e.sessions || 0) + 1 });
-      return send(200, { name: e.name, token: sign({ c: code, n: e.name, exp: Date.now() + SESSION_MS }) });
+      const type = typeOf(e);
+      return send(200, { name: e.name, type, token: sign({ c: code, n: e.name, t: type, exp: Date.now() + SESSION_MS }) });
     }
 
     if (action === "admin") {
@@ -127,7 +139,7 @@ module.exports = async function (context, req) {
       const op = body.op;
       if (op === "list") {
         const rows = (await T.list("codes", "code")).map(e => ({
-          code: e.RowKey, name: e.name, active: !!e.active, created: e.created, lastSeen: e.lastSeen || "",
+          code: e.RowKey, name: e.name, type: typeOf(e), active: !!e.active, created: e.created, lastSeen: e.lastSeen || "",
           sessions: e.sessions || 0, reads: e.reads || 0, stars: e.stars || 0,
           totalSecs: e.totalSecs || 0,
           online: !!e.online && !!e.active && Date.now() - Date.parse(e.lastSeen || 0) < ONLINE_MS,
@@ -139,10 +151,11 @@ module.exports = async function (context, req) {
       }
       if (op === "create") {
         const name = safeText(body.name, 40).trim();
-        if (!name) return send(400, { error: "Enter the learner's name" });
+        if (!name) return send(400, { error: "Enter the member's name" });
+        if (body.type !== "kids" && body.type !== "adult") return send(400, { error: "Choose Kids or Adult" });
         const code = await newCode();
-        await T.put("codes", "code", code, { name, active: true, created: new Date().toISOString(), sessions: 0, reads: 0, stars: 0 });
-        return send(200, { code, name });
+        await T.put("codes", "code", code, { name, type: body.type, active: true, created: new Date().toISOString(), sessions: 0, reads: 0, stars: 0 });
+        return send(200, { code, name, type: body.type });
       }
       if ((op === "revoke" || op === "restore" || op === "delete") && codeOk(body.code)) {
         if (op === "delete") await T.del("codes", "code", body.code);
@@ -182,8 +195,9 @@ module.exports = async function (context, req) {
       }
       return send(200, { ok: true });
     }
-    if (action === "catalog") return send(200, await catalog(req.query));
-    if (action === "discover") return send(200, await discover(req.query));
+    const adult = s.t === "adult";
+    if (action === "catalog") return send(200, await catalog(req.query, adult));
+    if (action === "discover") return send(200, await discover(req.query, adult));
     if (action === "text") {
       const id = parseInt(req.query.id, 10);
       if (!id || id < 1 || id > 9999999) return send(400, { error: "Bad id" });
