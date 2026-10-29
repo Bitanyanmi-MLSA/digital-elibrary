@@ -11,7 +11,8 @@ function corsHeaders(req) {
   return {
     "Access-Control-Allow-Origin": ALLOWED.includes(origin) ? origin : ALLOWED[0] || "",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, Range",
+    "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, Content-Length",
     "Vary": "Origin"
   };
 }
@@ -150,4 +151,4 @@ function isAdmin(req) {
   return crypto.timingSafeEqual(Buffer.from(given), Buffer.from(want));
 }
 
-module.exports = { begin, limited, clientIp, T, sign, sessionFrom, isAdmin, activeCache };
+module.exports = { begin, corsHeaders, limited, clientIp, T, sign, sessionFrom, isAdmin, activeCache };

@@ -1,6 +1,10 @@
 // Library API: access-code login, admin code management, usage tracking, and book catalogue/text proxy
 // (Project Gutenberg via Gutendex, Open Library). Route: /api/lib/{action}
-const { begin, limited, clientIp, T, sign, sessionFrom, isAdmin, activeCache } = require("../shared");
+const { begin, corsHeaders, limited, clientIp, T, sign, sessionFrom, isAdmin, activeCache } = require("../shared");
+
+// Official Ministry of Education learner books are streamed through here (the origin sends no CORS headers). Only upload paths ending in .pdf are allowed.
+const GES_BASE = "https://curriculumresources.edu.gh/wp-content/uploads/";
+const GES_PATH = /^\d{4}\/\d{2}\/[A-Za-z0-9_.%\-]+\.pdf$/;
 
 const BLOCKED = /\b(guns?|pistols?|rifles?|firearms?|bombs?|weapons?|knife|knives|stab|kill(?:ing|ed|s)?|murder|suicide|rape|sex(?:ual|y)?|porn\w*|nude|naked|drugs?|cocaine|heroin|marijuana|alcohol|erotic\w*|torture|massacre|war|violen(?:ce|t)|horror|ghosts?|vampires?|devil|satan)\b/i;
 // Curated, age-appropriate Project Gutenberg classics (fast and reliable); Gutendex search is best-effort.
@@ -202,6 +206,20 @@ module.exports = async function (context, req) {
       return send(200, { ok: true });
     }
     const adult = s.t === "adult";
+    if (action === "pdf") {
+      if (!adult) return send(403, { error: "Not available" });
+      const p = String(req.query.p || "");
+      if (!GES_PATH.test(p) || p.includes("..")) return send(400, { error: "Bad path" });
+      if (limited("pdf:" + s.c, 600, 60000)) return send(429, { error: "Too many requests" });
+      const range = String(req.headers.range || "");
+      const r = await fetch(GES_BASE + p, { headers: /^bytes=\d*-\d*$/.test(range) ? { Range: range } : {}, signal: AbortSignal.timeout(60000) });
+      if (r.status !== 200 && r.status !== 206) return send(502, { error: "Book unavailable" });
+      const headers = { ...corsHeaders(req), "Content-Type": "application/pdf", "Accept-Ranges": "bytes", "Cache-Control": "private, max-age=3600" };
+      const cr = r.headers.get("content-range");
+      if (cr) headers["Content-Range"] = cr;
+      context.res = { status: r.status, isRaw: true, headers, body: Buffer.from(await r.arrayBuffer()) };
+      return;
+    }
     if (action === "catalog") return send(200, await catalog(req.query, adult));
     if (action === "discover") return send(200, await discover(req.query, adult));
     if (action === "text") {

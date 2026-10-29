@@ -28,6 +28,9 @@ body.adult button{border-radius:6px}
 body.adult .chip{border-radius:6px}
 body.adult .cover{height:150px}
 body.adult .reader p{font-size:1.05em;line-height:1.75;max-width:70ch}
+.items{display:contents}
+.pgbox{margin:0 auto 10px;background:#fff;box-shadow:0 2px 8px #0003;position:relative}
+.pgbox canvas{display:block;width:100%;height:100%}
 body.adult .kidsonly{display:none!important}
 header{background:var(--g);color:#fff;padding:10px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;top:0;z-index:5;border-bottom:6px solid var(--y)}
 header h1{font-size:1.1em;margin:0;flex:1}
@@ -136,6 +139,20 @@ td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
     <small>Tip: tap any word to hear it and see what it means.</small>
     <div id="wordbox" style="margin-top:10px"></div>
     <div id="quiz"></div>
+  </div>
+</section>
+
+<section id="v-pdf" class="hide">
+  <div class="card" style="padding:12px">
+    <div class="sp" style="position:sticky;top:70px;background:var(--card);z-index:4;padding:6px 0">
+      <button onclick="closePdf()">← Back</button>
+      <b id="pdft" style="flex:1;min-width:120px"></b>
+      <span id="pdfpg"></span>
+      <button onclick="pdfJump()" title="Go to page">⤵ Page</button>
+      <button onclick="pdfZoom(-.2)" title="Zoom out">−</button>
+      <button onclick="pdfZoom(.2)" title="Zoom in">+</button>
+    </div>
+    <div id="pdfbody" style="text-align:center;background:#0001;border-radius:8px;padding:8px;overflow-x:auto"></div>
   </div>
 </section>
 
@@ -262,7 +279,7 @@ const st={role:'kids',age:'All',type:'All',q:'',cur:null,pin:'',user:null,code:n
 const BASE='https://funcflex-elibrary-47854.azurewebsites.net/api';
 const KIDS_SHELVES=['Starter Stories','Fables & Folktales','Animals & Nature','Adventure & Fantasy','Family & Growing Up','Open Library'];
 const GES_BASE='https://curriculumresources.edu.gh/wp-content/uploads/';
-const GES_NOTE='Official free learner textbooks published by the Ministry of Education / GES. They open from the Ministry\'s own website (nothing is copied here).';
+const GES_NOTE='Official free learner textbooks published by the Ministry of Education / GES. Tap a book to read it right here in the app.';
 const gesList=(yr,rows)=>rows.map(([t,e,p])=>[t+' – Year '+yr,GES_BASE+p,e,'SHS Year '+yr+' learner\'s book (PDF)']);
 const LINK_SHELVES={
  'Ghana Curriculum (GES)':{note:'Official Ghana curriculum and learning resources. Aki-Ola and other commercial textbooks are copyrighted and are not hosted here.',items:[['NaCCA SHS Curriculum','https://nacca.gov.gh/secondary-education-curriculum/','📘','Official syllabuses for all SHS subjects'],['MoE Year 1 Learning Materials','https://curriculumresources.edu.gh/year1/','1️⃣','Year 1 textbooks, released by section'],['MoE Learning Resources','https://curriculumresources.edu.gh/','🏛️','All curriculum documents and materials'],['NaCCA Home','https://nacca.gov.gh/','📚','National Council for Curriculum and Assessment']]},
@@ -327,6 +344,7 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 let homeTok=0;
 function tileHtml(b){const rid='g'+b.id;return `<div class="tile" onclick="openRemote(${b.id})"><div class="cover" style="background:${COV[b.id%6]}"><img src="${esc(b.cover)}" alt="" loading="lazy" style="max-height:130px;max-width:100%" onerror="this.replaceWith('📖')"></div><div class="t">${st.fav.has(rid)?'❤️ ':''}${esc(b.title)}<small>${esc(b.author)}</small></div></div>`}
 function recent(){const ks=Object.keys(st.read),last=ks[ks.length-1];if(!last)return '<b>👋 Pick a story to start your first reading mission!</b>';
+ if(last.startsWith('pdf:')){const m=st.meta[last];return m?`<b>▶ Continue reading:</b> ${esc(m.t)} <button onclick="openPdf('${m.url}','${m.t.replace(/'/g,'')}')">Continue</button>`:'<b>👋 Pick a book to start!</b>'}
  const m=last.startsWith('g')?st.meta[last]:LIB.find(x=>x.id==last);if(!m)return '<b>👋 Pick a story to start!</b>';
  return `<b>▶ Continue reading:</b> ${esc(m.t)} <button onclick="${last.startsWith('g')?`openRemote(${last.slice(1)})`:`openBook(${last})`}">Continue</button>`}
 async function renderHome(){const tok=++homeTok;chips($('#shelves'),SHELVES,'shelf');
@@ -339,7 +357,7 @@ async function renderHome(){const tok=++homeTok;chips($('#shelves'),SHELVES,'she
  const locHtml=loc.map(i=>`<div class="tile" onclick="openBook(${i.id})"><div class="cover" style="background:${COV[i.id%6]}">${i.e}</div><div class="t">${st.fav.has(i.id)?'❤️ ':''}${i.t}<small>${i.type} · Ages ${i.age}<br>${i.src}</small></div></div>`).join('');
  const g=$('#grid');
  if(!isAdult()&&st.shelf==='Starter Stories'&&!q){g.innerHTML=locHtml||'<p>No items found.</p>';return}
- if(isAdult()&&LINK_SHELVES[st.shelf]){const L=LINK_SHELVES[st.shelf];g.innerHTML=`<p style="grid-column:1/-1">${L.note}</p>`+L.items.filter(l=>!q||l[0].toLowerCase().includes(q)).map(l=>`<a class="tile" href="${l[1]}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><div class="cover" style="background:#e8f5ec">${l[2]}</div><div class="t">${l[0]}<small>${l[3]}<br>Opens in a new tab ↗</small></div></a>`).join('');return}
+ if(isAdult()&&LINK_SHELVES[st.shelf]){const L=LINK_SHELVES[st.shelf];g.innerHTML=`<p style="grid-column:1/-1">${L.note}</p>`+L.items.filter(l=>!q||l[0].toLowerCase().includes(q)).map(l=>l[1].startsWith(GES_BASE)&&l[1].endsWith('.pdf')?`<div class="tile" onclick="openPdf('${l[1]}','${l[0].replace(/'/g,'')}')"><div class="cover" style="background:#e8f5ec">${l[2]}</div><div class="t">${l[0]}<small>${l[3]}<br>Read in the app 📖</small></div></div>`:`<a class="tile" href="${l[1]}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><div class="cover" style="background:#e8f5ec">${l[2]}</div><div class="t">${l[0]}<small>${l[3]}<br>Opens in a new tab ↗</small></div></a>`).join('');return}
  g.innerHTML=locHtml+'<p>⏳ Loading books…</p>';
  try{let h='';
   if(st.shelf==='Open Library'){const j=await api('/lib/discover?q='+encodeURIComponent(q));if(tok!==homeTok)return;
@@ -391,6 +409,35 @@ function startQuiz(){stopRead();const qs=st.cur.q;let i=0,sc=0;const box=$('#qui
  window.ans=(j,a)=>{if(j===a){sc++;say('Well done!')}else say('Nice try!');i++;go()};
  const go=()=>{if(i>=qs.length){box.innerHTML=`<div class="card"><h3>🎉 You got ${sc}/${qs.length}!</h3></div>`;st.stars+=sc;badge('Finished: '+st.cur.t);if(sc===qs.length)badge('Quiz Star ⭐');return}
   const [q,o,a]=qs[i];box.innerHTML=`<div class="card"><h3>${q}</h3>`+o.map((x,j)=>`<button style="margin:4px" onclick="ans(${j},${a})">${x}</button>`).join('')+'</div>'};go()}
+/* ===== In-app PDF reader (pdf.js; pages stream from the Ministry site via the API, loaded and drawn on demand) ===== */
+let pdfDoc=null,pdfIO=null,pdfZ=1,pdfKey='',pdfTitle='',pdfUrl='',pdfSave=0;
+const loadScript=src=>new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=no;document.head.appendChild(s)});
+function closePdf(){if(pdfIO){pdfIO.disconnect();pdfIO=null}if(pdfDoc){pdfDoc.destroy();pdfDoc=null}$('#pdfbody').innerHTML='';show('home')}
+async function openPdf(url,title){pdfUrl=url;pdfTitle=title;pdfKey='pdf:'+url.slice(GES_BASE.length);pdfZ=1;
+ show('pdf');$('#pdft').textContent=title;$('#pdfpg').textContent='';$('#pdfbody').innerHTML='<p>⏳ Opening book…</p>';window.scrollTo(0,0);
+ st.meta[pdfKey]=st.meta[pdfKey]||{t:title,url,page:1};st.read[pdfKey]=1;save();track(true);
+ try{if(!window.pdfjsLib){await loadScript('js/pdf.min.js');pdfjsLib.GlobalWorkerOptions.workerSrc='js/pdf.worker.min.js'}
+  if(pdfDoc){pdfDoc.destroy();pdfDoc=null}
+  pdfDoc=await pdfjsLib.getDocument({url:BASE+'/lib/pdf?p='+encodeURIComponent(url.slice(GES_BASE.length)),httpHeaders:{Authorization:'Bearer '+token},rangeChunkSize:1<<20,disableAutoFetch:true,disableStream:true}).promise;
+  await pdfLayout(st.meta[pdfKey].page||1)}
+ catch(e){$('#pdfbody').innerHTML='<p>Sorry, this book could not be opened right now. Please check your internet and try again.</p>'}}
+async function pdfLayout(goto){const box=$('#pdfbody'),doc=pdfDoc;if(!doc)return;
+ const p1=await doc.getPage(1),v1=p1.getViewport({scale:1}),w=Math.min(box.clientWidth-16,1100)*pdfZ,sc=w/v1.width,h=v1.height*sc;
+ if(pdfIO)pdfIO.disconnect();box.innerHTML='';
+ pdfIO=new IntersectionObserver(es=>es.forEach(en=>{const d=en.target;if(en.isIntersecting)pdfDraw(d,sc);else if(d.dataset.done){d.innerHTML='';delete d.dataset.done}}),{rootMargin:'1500px 0px'});
+ for(let i=1;i<=doc.numPages;i++){const d=document.createElement('div');d.className='pgbox';d.dataset.n=i;d.style.width=w+'px';d.style.height=h+'px';box.appendChild(d);pdfIO.observe(d)}
+ pdfInfo();const t=box.children[Math.min(Math.max(goto||1,1),doc.numPages)-1];if(t)t.scrollIntoView()}
+async function pdfDraw(d,sc){if(d.dataset.done||d.dataset.busy||!pdfDoc)return;d.dataset.busy=1;const doc=pdfDoc;
+ try{const pg=await doc.getPage(+d.dataset.n),vp=pg.getViewport({scale:sc}),o=Math.min(window.devicePixelRatio||1,2),c=document.createElement('canvas');
+  c.width=Math.floor(vp.width*o);c.height=Math.floor(vp.height*o);d.style.height=vp.height+'px';
+  await pg.render({canvasContext:c.getContext('2d'),viewport:vp,transform:o!==1?[o,0,0,o,0,0]:null}).promise;
+  if(doc===pdfDoc){d.innerHTML='';d.appendChild(c);d.dataset.done=1}}catch(e){}
+ delete d.dataset.busy}
+function pdfCur(){const b=$('#pdfbody');for(const d of b.children){if(d.getBoundingClientRect().bottom>140)return +d.dataset.n}return pdfDoc?pdfDoc.numPages:1}
+function pdfInfo(){if(pdfDoc)$('#pdfpg').textContent='Page '+pdfCur()+' / '+pdfDoc.numPages}
+function pdfZoom(d){if(!pdfDoc)return;const cur=pdfCur();pdfZ=Math.min(3,Math.max(.6,+(pdfZ+d).toFixed(1)));pdfLayout(cur)}
+function pdfJump(){if(!pdfDoc)return;const n=parseInt(prompt('Go to page (1–'+pdfDoc.numPages+')',pdfCur()),10);if(n>=1&&n<=pdfDoc.numPages)$('#pdfbody').children[n-1].scrollIntoView()}
+addEventListener('scroll',()=>{if(!pdfDoc||$('#v-pdf').classList.contains('hide'))return;pdfInfo();clearTimeout(pdfSave);pdfSave=setTimeout(()=>{if(st.meta[pdfKey]){st.meta[pdfKey].page=pdfCur();save()}},600)},{passive:true});
 function badge(n){st.badges.add(n);save();track(false)}
 
 const KB=[[/ananse|spider/,"Ananse is the clever spider in Akan stories. In our library story he learns that wisdom belongs to everybody! 🕷️"],
