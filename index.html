@@ -217,8 +217,8 @@ td,th{padding:8px;border-bottom:1px solid #0002;text-align:left}
 </section>
 </main>
 
-<script>
-const $=s=>document.querySelector(s);
+<script src="js/ges1.js"></script>
+<script>const $=s=>document.querySelector(s);
 const COV=['#ffd6a5','#caffbf','#9bf6ff','#bdb2ff','#ffc6ff','#fdffb6'];
 const LIB=[
 {id:1,t:'Ananse and the Wisdom Pot',e:'🕷️',type:'Book',age:'6–12',src:'Original (sample)',txt:[
@@ -287,7 +287,8 @@ const LINK_SHELVES={
  'GES SHS Year 2 Books':{note:GES_NOTE,items:gesList(2,[['English Language','🗣️','2025/12/English-Language_LM_Year-2_-LV-Online.pdf'],['Mathematics','➗','2025/12/LM-maths-Book-2-LVersion.pdf'],['Additional Mathematics','📐','2025/12/Additional-Maths-book-2-Lversion.pdf'],['Social Studies','🌍','2026/01/SOCIAL-STUDIES-Y2-LM_LEARNERS-VERSION.pdf'],['General Science','🔬','2025/10/General-science-LM-book-2-LVersion.pdf'],['Physics','⚛️','2025/11/LM-Physics-book-2-_online.pdf'],['Chemistry','🧪','2025/11/LM-Chemistry-book-LVersion_REPLACEMENT.pdf'],['Biology','🧬','2025/10/LM-Biology-book-2-learner-version.pdf'],['Geography','🗺️','2025/10/Geography_YEAR-2.pdf'],['History','🏺','2025/10/LM-History-book-2-LVersion.pdf'],['Government','🏛️','2025/10/Government_YEAR-2.pdf'],['Economics','📈','2025/10/ECONOMICS-YEAR-2-LV-ONLINE.pdf'],['ICT','💻','2025/10/ICT-YEAR-2-LV-ONLINE.pdf'],['Accounting','🧾','2025/12/Accounting_LM_year-2_-LV-Online.pdf'],['Business Management','💼','2025/12/Business-Management-2-covered-lv.pdf'],['Agricultural Science','🌾','2025/12/Agricultural-Science-LV-ONLINE.pdf'],['Literature in English','📖','2025/10/Literature-In-English_LM_Y2_Learner-Edition_Online.pdf']])}
 };
 const GES_SHELF='Ghana Curriculum (GES)';
-const ADULT_SHELVES=['GES SHS Year 3 Books','GES SHS Year 2 Books',GES_SHELF,'Classic Literature','Mystery & Thrillers','Philosophy & Leadership','Science & Society','SHS Science','SHS Mathematics','SHS Geography & Agriculture','SHS English Literature','Economics & Government','Open Library'];
+LINK_SHELVES['GES SHS Year 1 Books']={note:'Official free Year 1 learner textbooks from the Ministry of Education / GES. Pick a subject, then a section, and read it right here in the app.',items:GES1.map((g,i)=>[g[0]+' – Year 1','ges1:'+i,'📗',g[1].length+' sections'])};
+const ADULT_SHELVES=['GES SHS Year 3 Books','GES SHS Year 2 Books','GES SHS Year 1 Books',GES_SHELF,'Classic Literature','Mystery & Thrillers','Philosophy & Leadership','Science & Society','SHS Science','SHS Mathematics','SHS Geography & Agriculture','SHS English Literature','Economics & Government','Open Library'];
 let SHELVES=KIDS_SHELVES;
 const isAdult=()=>st.role==='adult';
 const PAGE=6;
@@ -357,7 +358,9 @@ async function renderHome(){const tok=++homeTok;chips($('#shelves'),SHELVES,'she
  const locHtml=loc.map(i=>`<div class="tile" onclick="openBook(${i.id})"><div class="cover" style="background:${COV[i.id%6]}">${i.e}</div><div class="t">${st.fav.has(i.id)?'❤️ ':''}${i.t}<small>${i.type} · Ages ${i.age}<br>${i.src}</small></div></div>`).join('');
  const g=$('#grid');
  if(!isAdult()&&st.shelf==='Starter Stories'&&!q){g.innerHTML=locHtml||'<p>No items found.</p>';return}
- if(isAdult()&&LINK_SHELVES[st.shelf]){const L=LINK_SHELVES[st.shelf];g.innerHTML=`<p style="grid-column:1/-1">${L.note}</p>`+L.items.filter(l=>!q||l[0].toLowerCase().includes(q)).map(l=>l[1].startsWith(GES_BASE)&&l[1].endsWith('.pdf')?`<div class="tile" onclick="openPdf('${l[1]}','${l[0].replace(/'/g,'')}')"><div class="cover" style="background:#e8f5ec">${l[2]}</div><div class="t">${l[0]}<small>${l[3]}<br>Read in the app 📖</small></div></div>`:`<a class="tile" href="${l[1]}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><div class="cover" style="background:#e8f5ec">${l[2]}</div><div class="t">${l[0]}<small>${l[3]}<br>Opens in a new tab ↗</small></div></a>`).join('');return}
+ if(isAdult()&&LINK_SHELVES[st.shelf]){const L=LINK_SHELVES[st.shelf];
+  if(st.ges1!=null&&st.shelf==='GES SHS Year 1 Books'&&GES1[st.ges1]){const G=GES1[st.ges1];g.innerHTML=`<p style="grid-column:1/-1"><button onclick="st.ges1=null;renderHome()">← All Year 1 subjects</button> <b>${G[0]}</b></p>`+G[1].map((p,i)=>`<div class="tile" onclick="openPdf('${GES_BASE+p}','${G[0]} – Section ${i+1}')"><div class="cover" style="background:#e8f5ec">📗</div><div class="t">Section ${i+1}<small>${G[0]} – Year 1<br>Read in the app 📖</small></div></div>`).join('');return}
+  g.innerHTML=`<p style="grid-column:1/-1">${L.note}</p>`+L.items.filter(l=>!q||l[0].toLowerCase().includes(q)).map(l=>l[1].startsWith('ges1:')?`<div class="tile" onclick="st.ges1=${+l[1].slice(5)};renderHome();window.scrollTo(0,0)"><div class="cover" style="background:#e8f5ec">${l[2]}</div><div class="t">${l[0]}<small>${l[3]}<br>Choose a section ›</small></div></div>`:l[1].startsWith(GES_BASE)&&l[1].endsWith('.pdf')?`<div class="tile" onclick="openPdf('${l[1]}','${l[0].replace(/'/g,'')}')"><div class="cover" style="background:#e8f5ec">${l[2]}</div><div class="t">${l[0]}<small>${l[3]}<br>Read in the app 📖</small></div></div>`:`<a class="tile" href="${l[1]}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><div class="cover" style="background:#e8f5ec">${l[2]}</div><div class="t">${l[0]}<small>${l[3]}<br>Opens in a new tab ↗</small></div></a>`).join('');return}
  g.innerHTML=locHtml+'<p>⏳ Loading books…</p>';
  try{let h='';
   if(st.shelf==='Open Library'){const j=await api('/lib/discover?q='+encodeURIComponent(q));if(tok!==homeTok)return;
